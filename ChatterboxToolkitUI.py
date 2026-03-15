@@ -2372,4 +2372,4 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
 ensure_projects_base_dir() # Ensure base directory is created on startup
 
 if __name__ == "__main__":
-    demo.queue().launch()
+    demo.launch(inbrowser=True)

@@ -1,106 +1,31 @@
-# ChatterboxToolkitUI 🎙️🧠
+# 🗣️ ChatterboxToolkit-AutoSetup
 
-ChatterboxToolkitUI is a comprehensive web application built with Gradio that provides a user-friendly interface for advanced audio generation and workflow management using resemble-ai's Chatterbox model.
+A streamlined, fully automated deployment wrapper and Web GUI for [Resemble AI's Chatterbox](https://github.com/resemble-ai/chatterbox) Text-to-Speech model. 
 
-## Key Features
+Getting heavy local LLM/TTS models running can be a headache of dependency conflicts and virtual environment management. **ChatterboxToolkit-AutoSetup** solves this by providing one-click launch scripts that handle everything from environment creation and dependency resolution to automatically launching the Gradio UI in your browser.
 
--   **Centralized Project Management**: Create, select, and manage dedicated workspaces. All inputs, processed files, and generated outputs are automatically organized into a clean folder structure within the active project or a base directory.
+## ✨ Key Features
 
--   **Single Generation**:
-    -   **Text-to-Speech (TTS)**: Generate high-quality speech from text using a reference audio file to clone the speaker's voice.
-    -   **Voice Conversion (VC)**: Transfer the vocal characteristics of a reference speaker onto a source audio recording.
-    -   **Parameter Sweeping**: Generate multiple variations of a single output at once by sweeping across a range of values for any generation parameter (e.g., Temperature, Pace, etc.).
+- **🚀 True One-Click Setup:** Run `start.sh` or `start.bat`. The script automatically creates an isolated `toolkit` virtual environment, installs PyTorch/Gradio, downloads NLTK data, and boots the app.
+- **🍎 Apple Silicon Native:** Automatically routes hardware acceleration to use Apple's Metal Performance Shaders (`mps`) on macOS, bypassing the massive slowdowns caused by running models in CPU-only Docker containers.
+- **🌐 Auto-Browser Launch:** The moment the TTS pipeline is fully loaded into memory, your default web browser will automatically open the Gradio interface.
+- **🎙️ Full UI Capabilities:** Easy-to-use Gradio interface for text-to-speech generation, voice cloning embeddings, and emotional exaggeration tuning.
 
--   **Batch Processing**:
-    -   Process entire folders of prepared text or audio files in bulk with a single click.
-    -   Optionally concatenate all generated files from a batch run into a single, continuous audio file.
+## 🛠️ Prerequisites
 
--   **Data Preparation Suite**:
-    -   **Text Splitter**: Automatically chunk long text documents into smaller, model-friendly segments based on sentence boundaries and a configurable character limit.
-    -   **Audio Splitter**: Intelligently split long audio recordings into shorter clips by making cuts during periods of silence, with configurable duration and silence detection parameters.
+Before you run the auto-setup, ensure your system has the following:
+- **Python 3.10 or 3.11** 
+- **FFmpeg** (Required by PyDub/Audio processing)
+  - macOS: `brew install ffmpeg`
+  - Linux: `sudo apt install ffmpeg`
+  - Windows: `winget install ffmpeg`
 
--   **Workflow-Integrated Editing & Refinement**:
-    -   **Regenerate Audio**: The "Regenerate" workflow allows you to review individual audio files from a batch run, send them back to the Single TTS tab with their original text and voice pre-loaded, tweak parameters, and replace the old file with the new-and-improved version.
-    -   **Live Text Editor**: Directly edit the content of your processed text files within the UI and save the changes, perfect for making small script adjustments without leaving the application.
+## 🚀 Quick Start (Auto-Setup)
 
-[[Full Feature Rundown Video]](https://www.youtube.com/watch?v=fA8QWmG30no)
+Drop these files into your directory and run the launcher for your OS. The script handles the rest.
 
-## Prerequisites
-
-Before you begin, ensure you have the following installed on your system:
-
-1.  **Python**: Version **3.11** is required.
-2.  **Git**: For cloning the repository.
-3.  **CUDA Compatible GPU**: For acceptable performance, a GPU is highly recommended. The underlying models will be extremely slow on a CPU.
-4.  **FFmpeg**: This is a critical dependency for performing various audio processing tasks.
-
-## Installation Instructions
-
-Follow these steps to set up and run the ChatterboxToolkitUI on your local machine or use the ChatterboxToolkitUI.ipynb to run it in a colab environment.
-
-### 1. Clone the Repository
-
-Open your terminal or command prompt and clone the repository.
-
+### macOS / Linux
+Open your terminal, navigate to the folder, and run:
 ```bash
-git clone https://github.com/dasjoms/ChatterboxToolkitUI.git
-cd ChatterboxToolkitUI
-```
-
-### 2. Set Up a Python Virtual Environment
-
-Create a virtual environment using python 3.11 to avoid dependency conflicts.
-
-```bash
-py -3.11 -m venv toolkit
-```
-Activate the virtual environment.
-
-```bash
-.\toolkit\Scripts\activate
-```
-
-
-
-### 3. Install the Project and Dependencies
-
-Users with 10 series NVidia cards or AMD GPUs need to manually install the proper torch 2.6.0 versions.
-Otherwise just install from requirements.txt
-
-```bash
-pip install -r requirements.txt
-```
-
-
-## Running the Application
-
-With your virtual environment still active, run the script:
-
-```bash
-python ChatterboxToolkitUI.py
-```
-
-Once running, you will see output in your terminal like this:
-
-```
-* Running on local URL:  http://127.0.0.1:7860
-```
-
-Open the local URL in your web browser to use the application.
-
-## A Typical Workflow
-
-1.  **Create a Project**: Navigate to the "Projects" tab and create a new project.
-2.  **Prepare Data**:
-    -   Upload a long text file to the project's `input_files` folder using the "Project Utilities" uploader or manually move it there.
-    -   Go to the "Data Preparation" tab to split the text into manageable chunks. The outputs will be saved to the `processed_text/` folders.
-3.  **Generate Audio**:
-    -   Go to the "Batch Generation" tab.
-    -   Load your processed files from the project.
-    -   Select a reference voice and your desired parameters.
-    -   Run the batch generation.
-4.  **Review & Refine**:
-    -   Go to the "Edit Project Data" tab.
-    -   Use the "Regenerate" sub-tab to listen to your outputs. If one is imperfect, send it to the Single TTS tab, tweak the parameters, and replace it.
-    -   Use the "Edit Text" sub-tab to fix any pronounciation issues you find in your source text chunks.
-    -   Concatenate all audio files into one.
+chmod +x start.sh
+./start.sh

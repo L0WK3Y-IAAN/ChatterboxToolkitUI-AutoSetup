@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-
 import librosa
 import torch
 import perth
@@ -20,10 +19,6 @@ REPO_ID = "ResembleAI/chatterbox"
 
 
 def punc_norm(text: str) -> str:
-    """
-        Quick cleanup func for punctuation from LLMs or
-        containing chars not seen often in the dataset
-    """
     if len(text) == 0:
         return "You need to add some text for me to talk."
 
@@ -63,21 +58,6 @@ def punc_norm(text: str) -> str:
 
 @dataclass
 class Conditionals:
-    """
-    Conditionals for T3 and S3Gen
-    - T3 conditionals:
-        - speaker_emb
-        - clap_emb
-        - cond_prompt_speech_tokens
-        - cond_prompt_speech_emb
-        - emotion_adv
-    - S3Gen conditionals:
-        - prompt_token
-        - prompt_token_len
-        - prompt_feat
-        - prompt_feat_len
-        - embedding
-    """
     t3: T3Cond
     gen: dict
 
@@ -123,7 +103,8 @@ class ChatterboxTTS:
         self.tokenizer = tokenizer
         self.device = device
         self.conds = conds
-        self.watermarker = perth.PerthImplicitWatermarker()
+        self.watermarker = perth.DummyWatermarker()
+        
 
     @classmethod
     def from_local(cls, ckpt_dir, device) -> 'ChatterboxTTS':
@@ -208,6 +189,9 @@ class ChatterboxTTS:
     def generate(
         self,
         text,
+        repetition_penalty=1.2,
+        min_p=0.05,
+        top_p=1.0,
         audio_prompt_path=None,
         exaggeration=0.5,
         cfg_weight=0.5,
@@ -245,8 +229,9 @@ class ChatterboxTTS:
                 text_tokens=text_tokens,
                 max_new_tokens=1000,  # TODO: use the value in config
                 temperature=temperature,
-                cfg_weight=cfg_weight,
+                cfg_weight=cfg_weight
             )
+        
             # Extract only the conditional batch.
             speech_tokens = speech_tokens[0]
 
@@ -262,5 +247,6 @@ class ChatterboxTTS:
                 ref_dict=self.conds.gen,
             )
             wav = wav.squeeze(0).detach().cpu().numpy()
-            watermarked_wav = self.watermarker.apply_watermark(wav, sample_rate=self.sr)
-        return torch.from_numpy(watermarked_wav).unsqueeze(0)
+            #watermarked_wav = self.watermarker.apply_watermark(wav, sample_rate=self.sr)
+        #return torch.from_numpy(watermarked_wav).unsqueeze(0)
+        return torch.from_numpy(wav).unsqueeze(0)
