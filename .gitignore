@@ -46,3 +46,6 @@ checkpoints/
 
 # Ignore generated sample .wav files
 **/*.wav
+outputs/
+nltk_data/
+toolkit/
