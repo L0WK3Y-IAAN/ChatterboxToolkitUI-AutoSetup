@@ -1,6 +1,14 @@
 @echo off
 setlocal
 
+:: Script directory (no trailing backslash) for PATH
+set "SCRIPT_DIR=%~dp0"
+if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+
+:: Add script directory to User PATH if not already present (run from anywhere in new terminals)
+powershell -NoProfile -Command "& { param($d); $p = [Environment]::GetEnvironmentVariable('Path', 'User'); if ($p -and $p -notlike ('*' + $d + '*')) { [Environment]::SetEnvironmentVariable('Path', $p.TrimEnd(';') + ';' + $d, 'User'); Write-Host '[+] Added script directory to PATH. You can run chatterbox_start.bat from anywhere in new terminals.' } }" -ArgumentList "%SCRIPT_DIR%"
+set "PATH=%SCRIPT_DIR%;%PATH%"
+
 cd /d "%~dp0"
 
 echo ==========================================

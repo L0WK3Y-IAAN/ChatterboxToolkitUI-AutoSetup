@@ -49,3 +49,4 @@ checkpoints/
 outputs/
 nltk_data/
 toolkit/
+.chatterbox_setup_done

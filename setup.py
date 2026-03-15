@@ -7,6 +7,7 @@ import textwrap
 
 ROOT = Path(__file__).resolve().parent
 VENV = ROOT / "toolkit"
+SETUP_DONE_MARKER = ROOT / ".chatterbox_setup_done"
 
 def run(cmd, **kwargs):
     print(f"[*] Running: {' '.join(cmd)}")
@@ -68,10 +69,16 @@ def launch_ui():
     run([py, "ChatterboxToolkitUI.py"])
 
 def main():
+    if SETUP_DONE_MARKER.exists():
+        print("[+] Setup already complete. Launching UI...")
+        launch_ui()
+        return
+
     create_venv()
     install_deps()
     ensure_nltk_data()
 
+    SETUP_DONE_MARKER.touch()
     print("\n[+] Setup complete. Starting the UI...")
     launch_ui()
 
