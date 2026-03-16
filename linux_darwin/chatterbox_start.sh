@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Resolve script directory (absolute path) so we can add it to PATH and cd there
+# Resolve script directory (absolute path)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Repo root is one level up from this script directory
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Add script directory to PATH for this session and persist for future terminals
 add_to_path() {
@@ -28,29 +30,29 @@ if [[ ":$PATH:" != *":$SCRIPT_DIR:"* ]]; then
     add_to_path
 fi
 
-# Navigate to the script directory
-cd "$SCRIPT_DIR"
+# Navigate to the repo root so we always use the root env + setup.py
+cd "$ROOT_DIR"
 
 echo "=========================================="
 echo "    Chatterbox Toolkit UI Launcher"
 echo "=========================================="
 
-# Check if the virtual environment exists
-if [ ! -d "toolkit" ]; then
+# Check if the virtual environment exists in the repo root
+if [ ! -d "$ROOT_DIR/toolkit" ]; then
     echo "[*] Virtual environment not found. Creating 'toolkit'..."
-    python3 -m venv toolkit
+    python3 -m venv "$ROOT_DIR/toolkit"
     echo "[+] Virtual environment created successfully."
 else
     echo "[*] Virtual environment 'toolkit' already exists."
 fi
 
-# Activate the virtual environment
+# Activate the virtual environment from the repo root
 echo "[*] Activating virtual environment..."
-source toolkit/bin/activate
+source "$ROOT_DIR/toolkit/bin/activate"
 
 # Run the setup script (which will install dependencies and launch the UI)
-echo "[*] Running setup.py..."
-python setup.py
+echo "[*] Running setup.py from $ROOT_DIR..."
+python "$ROOT_DIR/setup.py"
 
 # Deactivate when done
 deactivate

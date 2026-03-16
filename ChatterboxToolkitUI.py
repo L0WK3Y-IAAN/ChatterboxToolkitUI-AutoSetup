@@ -105,7 +105,13 @@ from chatterbox.tts import ChatterboxTTS
 
 logging.basicConfig(level=logging.INFO)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+# Prefer Apple Silicon MPS if available, then CUDA, otherwise CPU
+if torch.backends.mps.is_available():
+    DEVICE = "mps"
+elif torch.cuda.is_available():
+    DEVICE = "cuda"
+else:
+    DEVICE = "cpu"
 _model_vc_instance = None
 _model_tts_instance = None
 
@@ -1260,7 +1266,24 @@ def create_zip_from_selection(selected_paths, project_root_dir):
 
 
 # --- Gradio Interface Layout ---
-with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
+CSS = """
+/* Make only the TTS download button stand out in orange.
+   Target the anchor with class 'download-link' inside the TTS audio component. */
+.chatterbox-tts-audio a.download-link > button,
+.chatterbox-tts-audio a.download-link > button:hover,
+.chatterbox-tts-audio a.download-link > button:focus {
+    background-color: #f97316 !important;  /* orange */
+    border-color: #ea580c !important;
+    color: #ffffff !important;
+}
+
+.chatterbox-tts-audio a.download-link > button svg {
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+}
+"""
+
+with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) as demo:
     gr.Markdown(
         """
         # ChatterboxToolkitUI
@@ -1347,7 +1370,13 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
                             gr.Markdown("### TTS Log")
                             tts_log = gr.Textbox(label="Log", lines=10, interactive=False, show_copy_button=True)
                             gr.Markdown("### Synthesized Audio Output")
-                            tts_audio_output = gr.Audio(label="Playback", type="numpy", visible=False)
+                            tts_audio_output = gr.Audio(
+                                label="Playback",
+                                type="numpy",
+                                visible=False,
+                                elem_classes=["chatterbox-tts-audio"],
+                                show_download_button=True,
+                            )
                             tts_output_files = gr.File(label="Download Generated Audio(s)", visible=False)
 
                     # TTS Button Click Event
