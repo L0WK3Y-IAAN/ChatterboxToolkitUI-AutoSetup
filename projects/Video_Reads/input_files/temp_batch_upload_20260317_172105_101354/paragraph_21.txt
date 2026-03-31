@@ -1,0 +1,2 @@
+{ 5:58 }
+This configuration allows us to read any local file within the applications sandbox. Now let's visualize exactly how the application processes our malicious input. We can trace the execution path from the moment the attacker sends the data to the moment the vulnerability triggers.

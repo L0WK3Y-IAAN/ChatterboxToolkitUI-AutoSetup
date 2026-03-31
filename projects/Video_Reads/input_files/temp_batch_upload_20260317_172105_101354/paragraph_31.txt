@@ -1,0 +1,1 @@
+We started by identifying the attack surface in the Android manifest, spotting an exported activity that was reachable via deep links. Then we dove into the source code and found that the application failed to properly validate input on the web path, allowing us to inject arbitrary URLs.

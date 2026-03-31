@@ -29,6 +29,17 @@ echo ==========================================
 echo     Chatterbox Toolkit UI Launcher
 echo ==========================================
 
+:: Choose model (base vs turbo) unless already specified via env var
+if "%CHATTERBOX_MODEL%"=="" (
+    echo.
+    echo Select TTS model:
+    echo   [1] Base (ChatterboxTTS)
+    echo   [2] Turbo (ChatterboxTurboTTS) ^(default^)
+    choice /C 12 /N /M "Enter choice [1-2]: "
+    if errorlevel 2 (set "CHATTERBOX_MODEL=turbo") else (set "CHATTERBOX_MODEL=base")
+)
+echo [*] Using CHATTERBOX_MODEL=%CHATTERBOX_MODEL%
+
 :: Check if the virtual environment exists in the repo root
 if not exist "%ROOT_DIR%\toolkit\Scripts\python.exe" (
     echo [*] Virtual environment not found. Creating 'toolkit'...

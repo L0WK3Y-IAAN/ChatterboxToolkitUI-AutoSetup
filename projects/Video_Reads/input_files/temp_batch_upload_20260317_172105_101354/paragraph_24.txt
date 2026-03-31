@@ -1,0 +1,2 @@
+{ 6:59 }
+If the path is web, the application's security logic is practically non existent. It extracts the URL parameter and sends it straight into the webview. There is 0 validation here, No checks on the domain, no checks on the protocol. It is an open door that allows us to load anything we want immediately.

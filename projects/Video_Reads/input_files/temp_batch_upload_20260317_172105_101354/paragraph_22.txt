@@ -1,0 +1,1 @@
+The attacker sends a deep link intent, usually by tricking a user into clicking a link. The system recognizes the scheme as targeting our app and routes the intent into Webview activity. This calls the oncreate method which grabs the URL data from the intent. This is the critical decision point.

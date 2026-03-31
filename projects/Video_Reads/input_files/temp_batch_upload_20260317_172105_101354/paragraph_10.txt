@@ -1,0 +1,1 @@
+Next up is the permission section declaring what the application needs access to Internet, storage, camera, contacts, and so on. Inside of the Android manifest, you'll typically find four types of Android components, depending on the application's functionality.

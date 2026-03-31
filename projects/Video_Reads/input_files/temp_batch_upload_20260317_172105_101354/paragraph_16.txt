@@ -1,0 +1,1 @@
+Because an attacker can craft any link they want. They can control the path, the query parameters, literally everything about the URL. If the app blindly trusts this input without validation, it's game over. Here's where the vulnerability begins. The activity gets the intent that launched it and extracts the Uri data consisting of our deep link.

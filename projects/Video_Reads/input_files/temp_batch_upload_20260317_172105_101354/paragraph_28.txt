@@ -1,0 +1,1 @@
+We have our scheme of insecure shop, host of com dot insecure shop and our web path. We will pass a harmless URL just to prove the injection works. Once we confirm the injection works, we swap the payload for something dangerous. In the second command, we keep the structure exactly the same, but change the URL parameter.

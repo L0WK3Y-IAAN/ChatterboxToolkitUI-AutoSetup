@@ -1,0 +1,1 @@
+2nd and most critical set allow universal access from file URLs. Is set to true. This is the master key.

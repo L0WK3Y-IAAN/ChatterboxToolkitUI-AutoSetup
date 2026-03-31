@@ -1,0 +1,1 @@
+Deep links are untrusted input. You must validate them strictly, and your Webview environment should always be locked down by default. I hope this breakdown gave you a practical understanding of how Android deep link vulnerabilities are identified and exploited. Thanks for watching.

@@ -1,0 +1,2 @@
+{ 4:58 }
+For this demo, I will be focusing only on the web path. When the path is web, it extracts the URL query parameter and assigns it directly to the data variable with 0 validation. Finally, the URL is loaded into the web view with the load URL method. This is the sync where attacker control data causes harm.

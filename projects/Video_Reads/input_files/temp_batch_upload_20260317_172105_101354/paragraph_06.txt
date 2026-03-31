@@ -1,0 +1,2 @@
+{ 0:55 }
+Go ahead and unzip the archive, then open your terminal to the location where the archive has been extracted. Inside of the bin folder, make the JDX GUI binary executable and proceed with launching the binary. Now we are ready to start analyzing Apks. I will be using the Insecure Shop practice application on GitHub.

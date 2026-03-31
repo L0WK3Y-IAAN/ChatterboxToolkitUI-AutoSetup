@@ -67,41 +67,22 @@ except Exception as e_initial_test: # Catch any error that means sent_tokenize d
 # External library imports for models and audio processing
 import pydub
 import webrtcvad
+import perth
 
-# NOTE: Make sure these are installed: pip install librosa soundfile huggingface_hub omegaconf numpy nltk pydub webrtcvad-wheels
-
-# --- PORTABILITY FIX: Dynamically find the path to the 'src' directory ---
-# Get the absolute path of the directory where the script is located
-script_dir = os.path.dirname(os.path.abspath(__file__)) 
-# Construct the path to the 'src' directory, which is a sibling to the script
-chatterbox_src_path = os.path.join(script_dir, 'src')
-
-# Add the 'src' path to the system path if it's not already there
-if chatterbox_src_path not in sys.path:
-    sys.path.insert(0, chatterbox_src_path)
-    old_sys_path = [] # Define for the print statement below
-    print(f"--- Dynamically added '{chatterbox_src_path}' to sys.path ---")
-else:
-    old_sys_path = [chatterbox_src_path] # Acts as a flag that path was already present
-
-
-# --- Import and Reload local chatterbox modules ---
-import chatterbox.vc
-import chatterbox.models.s3gen
-import chatterbox.tts
-importlib.reload(chatterbox.models.s3gen)
-importlib.reload(chatterbox.vc)
-importlib.reload(chatterbox.tts)
-
-# --- Debugging print statements (keep for verification) ---
-# This print statement is now just for confirming the load path
-print(f"Loaded chatterbox.models.s3gen from: {chatterbox.models.s3gen.__file__}")
-print(f"Loaded chatterbox.vc from: {chatterbox.vc.__file__}")
-print(f"Loaded chatterbox.tts from: {chatterbox.tts.__file__}")
+# NOTE: Make sure these are installed: pip install librosa soundfile huggingface_hub omegaconf numpy nltk pydub webrtcvad-wheels chatterbox-tts
 print(f"--------------------")
+
+# Some versions of perth used by chatterbox-turbo expose PerthImplicitWatermarker
+# as None depending on optional backends. If that's the case, fall back to the
+# lightweight DummyWatermarker so Turbo can still run end-to-end.
+if getattr(perth, "PerthImplicitWatermarker", None) is None:
+    class PerthImplicitWatermarker(perth.DummyWatermarker):  # type: ignore[attr-defined]
+        pass
+    perth.PerthImplicitWatermarker = PerthImplicitWatermarker  # type: ignore[attr-defined]
 
 from chatterbox.vc import ChatterboxVC
 from chatterbox.tts import ChatterboxTTS
+from chatterbox.tts_turbo import ChatterboxTurboTTS
 
 logging.basicConfig(level=logging.INFO)
 
@@ -114,6 +95,7 @@ else:
     DEVICE = "cpu"
 _model_vc_instance = None
 _model_tts_instance = None
+_tts_model_kind_loaded = None  # "base" | "turbo"
 
 # --- Global State for "Regenerate Audio" feature ---
 _last_single_tts_output_path_state_value = None # Stores the actual path string
@@ -127,11 +109,24 @@ def get_vc_model():
     return _model_vc_instance
 
 def get_tts_model():
-    global _model_tts_instance
-    if _model_tts_instance is None:
-        print(f"Loading ChatterboxTTS model on {DEVICE}...")
-        _model_tts_instance = ChatterboxTTS.from_pretrained(DEVICE)
-        print("ChatterboxTTS model loaded successfully.")
+    global _model_tts_instance, _tts_model_kind_loaded
+
+    model_kind = os.environ.get("CHATTERBOX_MODEL", "turbo").strip().lower()
+    if model_kind not in {"base", "turbo"}:
+        print(f"[!] Unknown CHATTERBOX_MODEL='{model_kind}', defaulting to 'turbo'.")
+        model_kind = "turbo"
+
+    # Reload model if the requested kind differs (mainly useful for dev hot-reloads)
+    if _model_tts_instance is None or _tts_model_kind_loaded != model_kind:
+        if model_kind == "base":
+            print(f"Loading ChatterboxTTS (base) model on {DEVICE}...")
+            _model_tts_instance = ChatterboxTTS.from_pretrained(DEVICE)
+            print("ChatterboxTTS (base) model loaded successfully.")
+        else:
+            print(f"Loading ChatterboxTurboTTS model on {DEVICE}...")
+            _model_tts_instance = ChatterboxTurboTTS.from_pretrained(device=DEVICE)
+            print("ChatterboxTurboTTS model loaded successfully.")
+        _tts_model_kind_loaded = model_kind
     return _model_tts_instance
 
 def sanitize_filename(name):
@@ -438,12 +433,14 @@ def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_we
             if seed_num != 0: set_seed(int(seed_num)); yield from yield_tts_updates(log_msg=f"Using seed: {int(seed_num)}")
             wav = model_tts.generate(text,audio_prompt_path=audio_prompt_path,exaggeration=exaggeration,temperature=temperature,cfg_weight=cfg_weight)
             output_sr_np = (model_tts.sr, wav.squeeze(0).numpy())
-            tts_output_filename = f"output_{datetime.now().strftime('%H%M%S_%f')}.wav"
+            # Use a snippet of the input text for the filename so downloads are meaningful.
+            tts_output_filename = f"{text_snippet_shorter}.wav"
             tts_output_filepath = os.path.join(tts_output_combined_dir, tts_output_filename)
             sf.write(tts_output_filepath, output_sr_np[1], output_sr_np[0]) 
             yield from yield_tts_updates(log_msg=f"Saved TTS audio to: {tts_output_filepath}")
             final_message = "Text-to-Voice generation complete."
-            yield from yield_tts_updates(log_msg=final_message, audio_data=output_sr_np, file_list=[tts_output_filepath])
+            # For the audio player, pass the filepath so the browser download uses this filename.
+            yield from yield_tts_updates(log_msg=final_message, audio_data=tts_output_filepath, file_list=[tts_output_filepath])
             gr.Info(final_message)
 
         if tts_output_filepath: # If a file was saved (primarily for single mode)
@@ -1267,6 +1264,100 @@ def create_zip_from_selection(selected_paths, project_root_dir):
 
 # --- Gradio Interface Layout ---
 CSS = """
+:root {
+    --cb-bg: #060709;
+    --cb-panel: #111827;
+    --cb-panel-soft: #0b0f18;
+    --cb-border-subtle: #1f2937;
+    --cb-text: #f9fafb;
+    --cb-text-muted: #9ca3af;
+    --cb-accent: #f97316;
+    --cb-accent-soft: rgba(249, 115, 22, 0.12);
+    --cb-radius-lg: 16px;
+    --cb-radius-md: 10px;
+}
+
+body, .gradio-container {
+    background: radial-gradient(circle at top left, #111827 0, #020617 45%, #000000 100%) !important;
+    color: var(--cb-text) !important;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif !important;
+}
+
+.gradio-container {
+    padding: 1.5rem 1.75rem !important;
+}
+
+/* Constrain main content for a centered “card” feel */
+.gradio-container > .gradio-app {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Top title */
+.gr-markdown h1 {
+    font-size: 1.7rem !important;
+    font-weight: 650 !important;
+    letter-spacing: 0.03em;
+}
+
+.gr-markdown p {
+    color: var(--cb-text-muted) !important;
+}
+
+/* Panels / blocks */
+.block, .gr-panel, .tabitem, .group {
+    background: transparent !important;
+    border-radius: var(--cb-radius-lg) !important;
+}
+
+.gr-box, .gr-panel {
+    background: linear-gradient(145deg, var(--cb-panel-soft), var(--cb-panel)) !important;
+    border: 1px solid var(--cb-border-subtle) !important;
+}
+
+/* Tabs */
+.tab-nav {
+    border-bottom: 1px solid var(--cb-border-subtle) !important;
+}
+
+.tab-nav button {
+    background: transparent !important;
+    border-radius: 999px !important;
+    padding-inline: 1rem !important;
+    color: var(--cb-text-muted) !important;
+}
+
+.tab-nav button.selected {
+    background: var(--cb-accent-soft) !important;
+    color: var(--cb-accent) !important;
+}
+
+/* Buttons */
+button, .gr-button {
+    border-radius: 999px !important;
+    font-weight: 500 !important;
+}
+
+.gr-button-primary, button.primary {
+    background: var(--cb-accent) !important;
+    border-color: #ea580c !important;
+    color: #111827 !important;
+}
+
+.gr-button-primary:hover, button.primary:hover {
+    background: #fb923c !important;
+}
+
+/* Sliders */
+input[type="range"]::-webkit-slider-thumb {
+    background: var(--cb-accent) !important;
+}
+
+/* Audio + log card */
+.chatterbox-tts-audio .wrap {
+    border-radius: var(--cb-radius-md) !important;
+}
+
 /* Make only the TTS download button stand out in orange.
    Target the anchor with class 'download-link' inside the TTS audio component. */
 .chatterbox-tts-audio a.download-link > button,
@@ -1311,7 +1402,8 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                             tts_text = gr.Textbox(
                                 value="The quick brown fox jumps over the lazy dog.",
                                 label="Text to synthesize (max chars 300)",
-                                max_lines=5,
+                                lines=5,
+                                max_lines=20,
                                 interactive=True,
                             )
                             with gr.Row(visible=False) as tts_text_project_row: # Hidden by default, controls visibility of its children
@@ -1372,7 +1464,7 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                             gr.Markdown("### Synthesized Audio Output")
                             tts_audio_output = gr.Audio(
                                 label="Playback",
-                                type="numpy",
+                                type="filepath",
                                 visible=False,
                                 elem_classes=["chatterbox-tts-audio"],
                                 show_download_button=True,

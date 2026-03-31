@@ -1,0 +1,2 @@
+{ 2:59 }
+These define how external apps, the system, or users can trigger each component. Essentially the attack surface of the application. Let's jump to the vulnerable activity we will be focusing on. This intent filter has several configurations. First, the view action. Think of this as the verb.

@@ -1,0 +1,2 @@
+{ 3:59 }
+This defines the custom URL format, a scheme of insecure shop and a host of com dot insecure shop. When combined, these tags create a rule. Any URL matching this format will instantly route to this activity. This brings us to the core security implication. Deep links are untrusted attacker controlled input.

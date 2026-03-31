@@ -1,0 +1,1 @@
+These components include activities, services, broadcast receivers, and content providers. These are the building blocks that make up the application. Within those component declarations, you'll see things like intent filters and exported attributes.

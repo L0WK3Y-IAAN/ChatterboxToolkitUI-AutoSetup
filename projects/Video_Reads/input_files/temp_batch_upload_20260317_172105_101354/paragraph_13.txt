@@ -1,0 +1,1 @@
+It tells Android that this activity is capable of displaying data to the user. It's the same mechanism used when you open a web page. Second, the default category. This is mandatory for the activity to accept implicit intents, allowing it to be triggered generally by other apps.

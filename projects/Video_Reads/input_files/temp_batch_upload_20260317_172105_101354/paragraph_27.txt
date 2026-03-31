@@ -1,0 +1,2 @@
+{ 7:57 }
+AM start tells the activity manager to start a new activity. The A flag specifies the action we are telling Android we want to view something. In this case the view action which is the standard action for opening a URL. Next is the D flag for data Everything. Following is the actual deep link we want to send.

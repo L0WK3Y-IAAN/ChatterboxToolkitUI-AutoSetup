@@ -1,0 +1,1 @@
+Both paths lead to the same destination, the vulnerable sync. This is where webview dot load URL is called and loads the malicious URL, thus completing the full attack chain of the insufficient URL validation vulnerability. Now we move to the exploitation phase.

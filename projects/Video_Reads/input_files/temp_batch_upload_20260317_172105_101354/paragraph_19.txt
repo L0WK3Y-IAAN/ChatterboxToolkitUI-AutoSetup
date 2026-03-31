@@ -1,0 +1,1 @@
+Additionally, there are two Webview configurations that turn this from a minor URL redirection bug into a critical vulnerability. First, JavaScript is enabled. This allows any page loaded inside the Webview to execute code in the apps context. Without this, any cross site scripting payload we try simply would not work.

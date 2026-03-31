@@ -1,0 +1,1 @@
+Third, we have the browsable category. This is a dangerous one. It explicitly allows the activity to be launched directly from a web browser. This means a simple link on a web page can trigger this app. Finally, the data tag.

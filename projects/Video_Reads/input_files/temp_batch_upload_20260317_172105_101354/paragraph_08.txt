@@ -1,0 +1,1 @@
+Once the download is complete, you can drag and drop the APK file into the Jadex GUI window to begin analysis. Before we dive into the vulnerability, we need to understand how Android applications are structured.

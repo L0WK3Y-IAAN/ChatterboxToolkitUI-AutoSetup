@@ -1,0 +1,2 @@
+{ 1:58 }
+Every Android app has a file called the Android Manifest. Think of it as the app's blueprint or a table of contents. The Android Manifest consists of the application's identity. At the very top, you'll find the package name, version code, and required SDK levels. This uniquely identifies the app on the device.

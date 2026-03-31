@@ -1,0 +1,1 @@
+It proceeds with checking the path component of the Uri. The code branch is based on whether the path is web or web view.

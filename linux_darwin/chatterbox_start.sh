@@ -37,6 +37,21 @@ echo "=========================================="
 echo "    Chatterbox Toolkit UI Launcher"
 echo "=========================================="
 
+# Choose model (base vs turbo) unless already specified via env var
+if [[ -z "${CHATTERBOX_MODEL:-}" ]]; then
+  echo ""
+  echo "Select TTS model:"
+  echo "  1) Base (ChatterboxTTS)"
+  echo "  2) Turbo (ChatterboxTurboTTS) [default]"
+  read -r -p "Enter choice [1-2]: " _cb_choice
+  case "${_cb_choice:-2}" in
+    1) export CHATTERBOX_MODEL="base" ;;
+    2) export CHATTERBOX_MODEL="turbo" ;;
+    *) echo "[*] Invalid choice, defaulting to Turbo."; export CHATTERBOX_MODEL="turbo" ;;
+  esac
+fi
+echo "[*] Using CHATTERBOX_MODEL=${CHATTERBOX_MODEL}"
+
 # Check if the virtual environment exists in the repo root
 if [ ! -d "$ROOT_DIR/toolkit" ]; then
     echo "[*] Virtual environment not found. Creating 'toolkit'..."

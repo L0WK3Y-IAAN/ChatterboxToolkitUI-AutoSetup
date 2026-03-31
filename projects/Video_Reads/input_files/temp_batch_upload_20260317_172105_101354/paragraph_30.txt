@@ -1,0 +1,2 @@
+{ 8:49 }
+Because of the dangerous web view settings we found earlier specifically allow universal access from file URLs, the app will blindly follow this path, read the private file from the disk inside of the application sandbox, and display its contents right on the screen. So what have we learned from dissecting this vulnerability?

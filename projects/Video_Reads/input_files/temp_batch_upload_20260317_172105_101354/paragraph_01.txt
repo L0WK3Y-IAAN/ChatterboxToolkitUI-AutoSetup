@@ -1,0 +1,1 @@
+Here is the updated format. The text now breaks with a double newline at the sentence boundary that is closest to the 300-character mark for each section:[ppl-ai-file-upload.s3.amazonaws]

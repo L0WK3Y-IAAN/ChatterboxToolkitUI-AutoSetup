@@ -1,0 +1,1 @@
+To simulate a victim clicking a malicious link, we will use the Android Debug Bridge also referred to as ADB. Let's breakdown the first command.

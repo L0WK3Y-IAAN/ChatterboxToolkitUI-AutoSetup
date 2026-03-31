@@ -1,0 +1,1 @@
+To start off this demo, let's head over to GitHub to download the tool Jadx. This tool will allow us to view the decompiled source code of the APK to understand how the application works. Jadx includes both a command line interface and a GUI version. For this demonstration, I'll be using the GUI version.

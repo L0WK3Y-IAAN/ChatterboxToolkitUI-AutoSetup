@@ -1,0 +1,1 @@
+This application contains a wide assortment of vulnerabilities for you to get practice exploiting. We will be specifically focusing on the insufficient URL validation vulnerability for this demo. Head over to the Releases section to download the APK that we will be analyzing.
