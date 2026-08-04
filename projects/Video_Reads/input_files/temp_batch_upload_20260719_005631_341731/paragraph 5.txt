@@ -1,0 +1,4 @@
+From there, cloning Mal trail from GitHub is a one-liner:
+
+git clone --depth 1 https://github.com/stamparm/maltrail.git
+cd maltrail

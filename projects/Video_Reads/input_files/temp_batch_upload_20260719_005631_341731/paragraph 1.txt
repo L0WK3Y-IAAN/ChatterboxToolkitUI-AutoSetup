@@ -1,0 +1,3 @@
+Clip 2: Installing Mal trail on Linux
+
+For this clip, you'll install Mal trail on Ubuntu Server 24.04, with the sensor and server running together on one host — the simplest setup, and the one most people start with.

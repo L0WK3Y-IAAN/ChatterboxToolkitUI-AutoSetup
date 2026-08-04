@@ -1,0 +1,7 @@
+With the repo in place, the sensor and server are two separate processes, and you'll run them in two separate terminals. First, the sensor — this needs root privileges because it's capturing packets directly off the network interface:
+
+sudo python3 sensor.py
+
+Then, in a second terminal, the server:
+
+python3 server.py

@@ -1,0 +1,1 @@
+Step two installs pcapy-ng specifically — not the older pcapy package. That's the same stumbling block worth flagging on its own: pcapy is deprecated and breaks under modern Python 3, so pcapy-ng is the one you actually want.

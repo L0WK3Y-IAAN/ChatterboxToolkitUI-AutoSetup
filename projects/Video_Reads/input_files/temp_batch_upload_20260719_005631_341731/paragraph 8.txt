@@ -1,0 +1,1 @@
+By the end of this demo, you'll have walked through that entire sequence live: installing dependencies, cloning the repo, starting both processes, logging into the dashboard, and watching a real detection land.

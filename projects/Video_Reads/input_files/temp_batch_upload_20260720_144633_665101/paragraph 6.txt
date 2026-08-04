@@ -1,0 +1,1 @@
+The script also drops a demo trail file into Mal trail's custom trails folder. This is what gives you something to actually detect later — a known-bad indicator you can deliberately trigger to prove the install is working, rather than waiting around for real malicious traffic to show up.

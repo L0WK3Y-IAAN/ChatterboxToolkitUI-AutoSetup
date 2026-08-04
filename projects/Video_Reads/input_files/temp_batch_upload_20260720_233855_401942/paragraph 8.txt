@@ -1,0 +1,1 @@
+To prove the new port actually works and isn't just a config change on paper, run the same nslookup against morphed.ru from the sensor host again, and confirm the detection still lands on the server's dashboard. If it shows up, the sensor and server are talking over the new port successfully.

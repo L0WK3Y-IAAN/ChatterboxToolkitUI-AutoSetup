@@ -1,0 +1,3 @@
+Reveal 2: pcap capture (arrow into Sensor)
+
+That traffic reaches the Sensor through packet capture — pcap, specifically using a library called pcapy-ng.

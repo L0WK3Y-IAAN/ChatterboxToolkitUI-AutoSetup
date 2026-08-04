@@ -1,0 +1,1 @@
+Start both processes — sensor on one host, server on the other — and the connection between them is otherwise silent. There's no handshake message, no "connected" banner. The way you actually confirm it's working is the same as before: trigger a detection and watch for it in the dashboard.

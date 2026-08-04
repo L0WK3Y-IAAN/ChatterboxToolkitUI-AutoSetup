@@ -1,0 +1,1 @@
+The Server's job is twofold: store those events, and power the reporting web application. This is where Mal trail makes an interesting choice — it uses a "fat client" model, so the Server just ships compressed chunks of raw data rather than doing heavy processing itself.

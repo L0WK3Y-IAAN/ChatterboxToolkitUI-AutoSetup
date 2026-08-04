@@ -1,0 +1,1 @@
+Step three clones Mal trail from GitHub into /opt/maltrail. If that directory already exists, the script just pulls the latest changes instead of re-cloning.

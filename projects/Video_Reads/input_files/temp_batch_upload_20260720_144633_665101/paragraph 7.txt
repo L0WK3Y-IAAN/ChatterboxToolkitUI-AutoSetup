@@ -1,0 +1,1 @@
+Once setup finishes, the script detects this machine's network address and offers to start everything for you — both processes launch in the background, and it hands you the dashboard URL along with the default login. Log in with admin and changeme! and confirm the dashboard loads. That alone tells you the baseline install is working.

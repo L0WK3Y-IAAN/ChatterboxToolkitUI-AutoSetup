@@ -1,0 +1,1 @@
+Once the Sensor flags something, it needs somewhere to send it. If the Sensor and Server are on the same machine — the default setup — it just writes straight into a local log directory. If they're on separate machines, it sends events over UDP to the Server instead. Either way, the result lands as CSV files, one per day.

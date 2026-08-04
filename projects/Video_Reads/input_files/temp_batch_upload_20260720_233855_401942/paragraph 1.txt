@@ -1,0 +1,3 @@
+Section 3: Setting Up Distributed Sensor Nodes
+
+Running the sensor and server together on one host is great for testing, but it doesn't reflect how Mal trail gets deployed in a real environment. A single server usually needs visibility across several network segments at once, and that means running standalone sensors that report their detections back to one centralized server, rather than each host storing and displaying its own logs in isolation.

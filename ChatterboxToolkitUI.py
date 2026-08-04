@@ -16,6 +16,8 @@ import shutil
 import zipfile
 import json # For manifest
 import random
+import gc
+import numpy as np
 
 # NLTK for text processing
 import nltk
@@ -86,6 +88,10 @@ from chatterbox.tts_turbo import ChatterboxTurboTTS
 
 logging.basicConfig(level=logging.INFO)
 
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
+
 # Prefer Apple Silicon MPS if available, then CUDA, otherwise CPU
 if torch.backends.mps.is_available():
     DEVICE = "mps"
@@ -105,6 +111,7 @@ def get_vc_model():
     if _model_vc_instance is None:
         print(f"Loading ChatterboxVC model on {DEVICE}...")
         _model_vc_instance = ChatterboxVC.from_pretrained(DEVICE)
+        gc.collect()
         print("ChatterboxVC model loaded successfully.")
     return _model_vc_instance
 
@@ -121,10 +128,12 @@ def get_tts_model():
         if model_kind == "base":
             print(f"Loading ChatterboxTTS (base) model on {DEVICE}...")
             _model_tts_instance = ChatterboxTTS.from_pretrained(DEVICE)
+            gc.collect()
             print("ChatterboxTTS (base) model loaded successfully.")
         else:
             print(f"Loading ChatterboxTurboTTS model on {DEVICE}...")
             _model_tts_instance = ChatterboxTurboTTS.from_pretrained(device=DEVICE)
+            gc.collect()
             print("ChatterboxTurboTTS model loaded successfully.")
         _tts_model_kind_loaded = model_kind
     return _model_tts_instance
@@ -142,6 +151,43 @@ def get_text_snippet_for_filename(text, max_len=30):
     s = s.strip('_') 
     if not s: return "untitled_text"
     return s[:max_len]
+
+def _split_tts_text(text, max_chars=340):
+    try:
+        sentences = nltk.sent_tokenize(text)
+    except Exception:
+        sentences = [text]
+    chunks, current = [], ""
+    for s in sentences:
+        s = s.strip()
+        if not s:
+            continue
+        candidate = f"{current} {s}".strip() if current else s
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            current = s
+    if current:
+        chunks.append(current)
+    return chunks if chunks else [text]
+
+def _synthesize_speech(model_tts, text, audio_prompt_path, exaggeration, temperature, cfg_weight, max_chars=280):
+    chunks = _split_tts_text(text, max_chars)
+    if len(chunks) <= 1:
+        wav = model_tts.generate(text, audio_prompt_path=audio_prompt_path, exaggeration=exaggeration, temperature=temperature, cfg_weight=cfg_weight)
+        return wav.squeeze(0).numpy()
+    gap = int(0.10 * model_tts.sr)
+    pieces = []
+    for chunk in chunks:
+        wav = model_tts.generate(chunk, audio_prompt_path=audio_prompt_path, exaggeration=exaggeration, temperature=temperature, cfg_weight=cfg_weight)
+        pieces.append(wav.squeeze(0).numpy())
+        gc.collect()
+    out = pieces[0]
+    for p in pieces[1:]:
+        out = np.concatenate([out, np.zeros(gap), p])
+    return out
 
 def set_seed(seed: int):
     torch.manual_seed(seed)
@@ -317,7 +363,7 @@ def get_project_file_absolute_path(filename, subdir_key):
     if subdir_key not in PROJECT_SUBDIRS: return None
     return os.path.join(_current_project_root_dir, PROJECT_SUBDIRS[subdir_key], filename)
 
-def generate_vc(audio_filepath,target_voice_filepath,inference_cfg_rate: float,sigma_min: float,batch_mode: bool,batch_parameter: str,batch_values_str: str ):
+def generate_vc(audio_filepath,target_voice_filepath,inference_cfg_rate: float,sigma_min: float,batch_mode: bool,batch_parameter: str,batch_values_str: str, progress: gr.Progress = gr.Progress(track_tqdm=True) ):
     model_vc = get_vc_model()
     yield from yield_vc_updates(log_msg="Starting Voice Conversion...", log_append=False, audio_data=None, file_list=None)
     base_output_dir = ""
@@ -419,8 +465,8 @@ def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_we
                 if current_seed_num != 0: set_seed(int(current_seed_num)); yield from yield_tts_updates(log_msg=f"Using seed: {int(current_seed_num)} for this item.")
                 logging.info(f"Generating item {i+1}/{len(batch_values)}: {batch_parameter}={value}") 
                 yield from yield_tts_updates(log_msg=f"Generating item {i+1}/{len(batch_values)}: {batch_parameter}={value}")
-                wav = model_tts.generate(text,audio_prompt_path=audio_prompt_path,exaggeration=current_exaggeration,temperature=current_temperature,cfg_weight=current_cfg_weight)
-                output_sr_np = (model_tts.sr, wav.squeeze(0).numpy())
+                audio_np = _synthesize_speech(model_tts, text, audio_prompt_path=audio_prompt_path, exaggeration=current_exaggeration, temperature=current_temperature, cfg_weight=current_cfg_weight)
+                output_sr_np = (model_tts.sr, audio_np)
                 tts_output_filename = f"{param_prefix}_{datetime.now().strftime('%H%M%S_%f')}.wav"
                 tts_output_filepath = os.path.join(batch_run_dir, tts_output_filename)
                 sf.write(tts_output_filepath, output_sr_np[1], output_sr_np[0])
@@ -431,8 +477,8 @@ def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_we
             gr.Info(final_message)
         else: 
             if seed_num != 0: set_seed(int(seed_num)); yield from yield_tts_updates(log_msg=f"Using seed: {int(seed_num)}")
-            wav = model_tts.generate(text,audio_prompt_path=audio_prompt_path,exaggeration=exaggeration,temperature=temperature,cfg_weight=cfg_weight)
-            output_sr_np = (model_tts.sr, wav.squeeze(0).numpy())
+            audio_np = _synthesize_speech(model_tts, text, audio_prompt_path=audio_prompt_path, exaggeration=exaggeration, temperature=temperature, cfg_weight=cfg_weight)
+            output_sr_np = (model_tts.sr, audio_np)
             # Use a snippet of the input text for the filename so downloads are meaningful.
             tts_output_filename = f"{text_snippet_shorter}.wav"
             tts_output_filepath = os.path.join(tts_output_combined_dir, tts_output_filename)
@@ -647,7 +693,7 @@ def handle_batch_tts_zip_upload(zip_filepath):
     try:
         with zipfile.ZipFile(zip_filepath, 'r') as zip_ref:
             for member in zip_ref.namelist():
-                if member.endswith('.txt') and not os.path.basename(member).startswith('__MACOSX'): 
+                if member.endswith('.txt') and '__MACOSX' not in member: 
                     target_file_path = os.path.join(extract_path, os.path.basename(member))
                     with zip_ref.open(member) as source, open(target_file_path, "wb") as target: shutil.copyfileobj(source, target)
                     extracted_files.append(target_file_path)
@@ -719,8 +765,8 @@ def run_batch_tts(ref_audio_path_tts_batch,tts_exaggeration_batch,tts_temp_batch
             if tts_seed_num_batch != 0: set_seed(int(tts_seed_num_batch))
             log_messages_list.append(f"Generating audio for {text_filename} ({i+1}/{len(text_files_to_process_list)})...")
             yield from yield_batch_tts_updates(log_msg="\n".join(log_messages_list), log_append=False, file_list=None) 
-            wav = model_tts.generate(text_content,audio_prompt_path=ref_audio_path_tts_batch,exaggeration=tts_exaggeration_batch,temperature=tts_temp_batch,cfg_weight=tts_cfg_weight_batch)
-            output_sr_np = (model_tts.sr, wav.squeeze(0).numpy())
+            audio_np = _synthesize_speech(model_tts, text_content, audio_prompt_path=ref_audio_path_tts_batch, exaggeration=tts_exaggeration_batch, temperature=tts_temp_batch, cfg_weight=tts_cfg_weight_batch)
+            output_sr_np = (model_tts.sr, audio_np)
             output_filename = f"{sanitize_filename(os.path.splitext(text_filename)[0])}_{datetime.now().strftime('%H%M%S_%f')}.wav"
             output_path = os.path.join(single_files_output_dir, output_filename)
             sf.write(output_path, output_sr_np[1], output_sr_np[0])
@@ -759,7 +805,7 @@ def handle_batch_vc_zip_upload(zip_filepath_vc):
     try:
         with zipfile.ZipFile(zip_filepath_vc, 'r') as zip_ref:
             for member in zip_ref.namelist():
-                if member.lower().endswith(valid_audio_extensions) and not os.path.basename(member).startswith('__MACOSX'):
+                if member.lower().endswith(valid_audio_extensions) and '__MACOSX' not in member:
                     target_file_path = os.path.join(extract_path, os.path.basename(member))
                     with zip_ref.open(member) as source, open(target_file_path, "wb") as target: shutil.copyfileobj(source, target)
                     extracted_files.append(target_file_path)
@@ -1425,8 +1471,8 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
 
 
                             gr.Markdown("### TTS Parameters")
-                            tts_exaggeration = gr.Slider(0.25, 2, step=.05, label="Exaggeration", info="Neutral = 0.5, extreme values can be unstable.", value=.5)
-                            tts_cfg_weight = gr.Slider(0.0, 1, step=.05, label="CFG/Pace", info="Classifier-Free Guidance weight for pacing and clarity.", value=0.5)
+                            tts_exaggeration = gr.Slider(0.25, 2, step=.05, label="Exaggeration", info="Neutral = 0.5, extreme values can be unstable.", value=0.6)
+                            tts_cfg_weight = gr.Slider(0.0, 1, step=.05, label="CFG/Pace", info="Classifier-Free Guidance weight for pacing and clarity.", value=0.2)
 
                             with gr.Accordion("More TTS Options", open=False):
                                 tts_seed_num = gr.Number(value=0, label="Random seed (0 for random)", info="Set a seed for reproducible generations (0 for truly random).")
@@ -1693,8 +1739,8 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                                 batch_tts_ref_audio_refresh_btn = gr.Button("Refresh", visible=False)
 
                             gr.Markdown("#### Batch TTS Parameters (Fixed for all files)")
-                            batch_tts_exaggeration = gr.Slider(0.25, 2, step=.05, label="Exaggeration", info="Neutral = 0.5, extreme values can be unstable.", value=.5)
-                            batch_tts_cfg_weight = gr.Slider(0.0, 1, step=.05, label="CFG/Pace", info="Classifier-Free Guidance weight for pacing and clarity.", value=0.5)
+                            batch_tts_exaggeration = gr.Slider(0.25, 2, step=.05, label="Exaggeration", info="Neutral = 0.5, extreme values can be unstable.", value=0.6)
+                            batch_tts_cfg_weight = gr.Slider(0.0, 1, step=.05, label="CFG/Pace", info="Classifier-Free Guidance weight for pacing and clarity.", value=0.2)
                             batch_tts_seed_num = gr.Number(value=0, label="Random seed (0 for random)", info="Set a seed for reproducible generations (0 for truly random).")
                             batch_tts_temp = gr.Slider(0.05, 5, step=.05, label="Temperature", info="Controls the randomness of the output speech, higher values for more variability.", value=.8)
 
@@ -2483,10 +2529,20 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
             )
 
 
-    # On demo load, ensure project dependent UI is correctly initialized (no project active)
+    def _startup_load_default_project():
+        try:
+            ensure_projects_base_dir()
+            project_results = set_current_project_instance('Video_Reads')
+            default_ref = get_project_file_absolute_path('Final Monolouge.wav', 'voice_conversion')
+            if default_ref and os.path.exists(default_ref):
+                return project_results + (gr.update(value=default_ref),)
+            return project_results + (gr.update(value=None),)
+        except Exception:
+            return set_current_project_instance(None) + (gr.update(value=None),)
+
     demo.load(
-        fn=lambda: set_current_project_instance(None),
-        outputs=all_project_dependent_ui_elements
+        fn=_startup_load_default_project,
+        outputs=all_project_dependent_ui_elements + [tts_ref_audio]
     )
 
 

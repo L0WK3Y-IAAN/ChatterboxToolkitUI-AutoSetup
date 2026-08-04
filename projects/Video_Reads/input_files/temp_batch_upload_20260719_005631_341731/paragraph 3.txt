@@ -1,0 +1,1 @@
+Everything you're about to see typed out by hand is also available as a ready-to-run script — install-maltrail.sh — in this course's Resources tab, in case you'd rather automate it on your own machine instead of typing each command yourself.

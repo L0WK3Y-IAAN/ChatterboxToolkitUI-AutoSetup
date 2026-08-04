@@ -1,0 +1,3 @@
+Reveal 8: Threat Feeds + Heuristics — feeds Sensor
+
+Now look at what feeds into that Sensor from below. Two independent inputs land on it at the same time. Threat Feeds pulls in more than seventy public blacklists, plus a large set of manually compiled static trails. Heuristics is a separate, optional layer that doesn't rely on any blacklist — it looks for suspicious patterns instead, like unusually long domain names or excessive failed DNS lookups. These two don't feed each other; they're parallel streams that both land on the Sensor.

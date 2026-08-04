@@ -1,0 +1,1 @@
+The last thing the script prints is the dashboard URL, along with Mal trail's default login — admin and changeme! — and a reminder of the two manual commands, sudo python3 server.py and sudo python3 sensor.py, in case you ever need to start them by hand instead of through the script.

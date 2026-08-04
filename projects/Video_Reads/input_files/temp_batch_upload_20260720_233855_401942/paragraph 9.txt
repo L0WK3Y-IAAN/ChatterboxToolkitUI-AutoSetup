@@ -1,0 +1,1 @@
+That's the core of a distributed deployment: sensors doing the capturing and matching close to the traffic they're watching, and one server aggregating everything into a single place to review — with the reporting port itself being a straightforward config value you're free to change on both ends when it doesn't fit your environment.

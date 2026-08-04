@@ -1,0 +1,1 @@
+And finally, what comes out of the Server. Log Storage is simply where everything lives long-term — CSV files organized by day. Integrations is how Mal trail plays with the rest of a security stack — forwarding events to Syslog or Logstash, exposing attacker IPs for a Fail2ban-style block list, or feeding into a tool like Splunk.

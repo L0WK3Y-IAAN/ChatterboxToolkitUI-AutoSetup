@@ -1,0 +1,1 @@
+The Client is just a standard web browser. No separate app required. That's where you get the dashboard: a timeline across the top, summary charts in the middle, and a detailed, paginated event table at the bottom.

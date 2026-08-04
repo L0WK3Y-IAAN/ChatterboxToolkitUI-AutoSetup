@@ -1,0 +1,3 @@
+Reveal 1: Traffic
+
+Everything starts with Traffic — the live network packets moving across the environment. Mal trail doesn't sit inline and doesn't generate this traffic itself; it just watches. Typically that means a SPAN port or a mirror port on a switch, copying real traffic over to the machine running the sensor.

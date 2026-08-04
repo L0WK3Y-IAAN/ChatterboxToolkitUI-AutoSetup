@@ -1,0 +1,1 @@
+The Sensor is where the actual detection happens. It inspects every packet going by and checks it against a huge set of known-bad indicators, called trails — domain names, URLs, IP addresses, even HTTP User-Agent strings. A match gets logged as an event.

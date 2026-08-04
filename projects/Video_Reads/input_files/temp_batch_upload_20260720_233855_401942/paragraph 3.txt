@@ -1,0 +1,1 @@
+Start with the sensor host. Once you pick Sensor, the script asks for the remote server's address — an IP and port, for example 192.168.12.138:8337. Behind the scenes, this writes a LOG_SERVER line into maltrail.conf, which tells the sensor to stop writing events to a local log directory and instead report every detection over UDP to that address.

@@ -1,0 +1,3 @@
+Reveal 6: HTTP (compressed), Fat client (arrow into Client)
+
+That data travels to the browser over HTTP, and all the real processing — summarizing, charting, filtering — happens client-side, inside the browser's own JavaScript.

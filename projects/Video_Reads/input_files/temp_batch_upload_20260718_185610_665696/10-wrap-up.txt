@@ -1,0 +1,1 @@
+So, top to bottom: live traffic gets mirrored to a Sensor that checks it against both threat feeds and heuristics, logs matches to a Server either locally or over UDP, and that Server serves everything to a browser-based client — while every event also gets archived and, optionally, pushed out to the rest of your security tooling.

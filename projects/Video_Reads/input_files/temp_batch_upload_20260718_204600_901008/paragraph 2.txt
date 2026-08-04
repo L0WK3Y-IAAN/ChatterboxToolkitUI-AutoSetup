@@ -1,0 +1,1 @@
+Rather than typing every command by hand, this demo uses an install script — install-maltrail.sh — that automates the whole process. Worth walking through what it's actually doing, since it's doing more than a simple copy-paste of commands would.

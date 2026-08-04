@@ -1,0 +1,1 @@
+By the end of this demo, you'll have that install script run end to end: dependencies in place, Mal trail cloned, the server and sensor both running in the background, and the dashboard loading in a browser with a real detection logged.

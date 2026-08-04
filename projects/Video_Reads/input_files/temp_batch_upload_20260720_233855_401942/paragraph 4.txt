@@ -1,0 +1,1 @@
+On the server host, choosing Server does the opposite kind of configuration work: it sets UDP_ADDRESS to 0.0.0.0 and UDP_PORT to 8337, which opens the server up to accept incoming detections from any sensor on the network, rather than only from a sensor running on the same machine.

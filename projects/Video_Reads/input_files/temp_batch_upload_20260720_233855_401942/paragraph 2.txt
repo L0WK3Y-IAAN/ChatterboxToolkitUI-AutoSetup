@@ -1,0 +1,1 @@
+You'll set this up using the same maltrail-setup.sh script from earlier, just with different role choices on two separate machines. On the sensor host, you'll choose Sensor. On the server host, you'll choose Server. That single choice is what changes everything else the script does from here.

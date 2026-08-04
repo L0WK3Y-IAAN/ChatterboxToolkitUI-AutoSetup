@@ -1,0 +1,1 @@
+Next, the script clones Mal trail straight from its GitHub repository into /opt/maltrail. If it detects the repo is already there from a previous run, it pulls the latest changes instead of cloning fresh — so it's safe to run more than once.

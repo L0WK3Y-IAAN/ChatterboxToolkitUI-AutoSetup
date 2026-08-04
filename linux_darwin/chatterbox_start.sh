@@ -41,13 +41,13 @@ echo "=========================================="
 if [[ -z "${CHATTERBOX_MODEL:-}" ]]; then
   echo ""
   echo "Select TTS model:"
-  echo "  1) Base (ChatterboxTTS)"
-  echo "  2) Turbo (ChatterboxTurboTTS) [default]"
+  echo "  1) Base (ChatterboxTTS) [default]"
+  echo "  2) Turbo (ChatterboxTurboTTS)"
   read -r -p "Enter choice [1-2]: " _cb_choice
-  case "${_cb_choice:-2}" in
+  case "${_cb_choice:-1}" in
     1) export CHATTERBOX_MODEL="base" ;;
     2) export CHATTERBOX_MODEL="turbo" ;;
-    *) echo "[*] Invalid choice, defaulting to Turbo."; export CHATTERBOX_MODEL="turbo" ;;
+    *) echo "[*] Invalid choice, defaulting to Base."; export CHATTERBOX_MODEL="base" ;;
   esac
 fi
 echo "[*] Using CHATTERBOX_MODEL=${CHATTERBOX_MODEL}"

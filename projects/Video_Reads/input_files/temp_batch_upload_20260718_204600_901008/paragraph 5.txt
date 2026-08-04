@@ -1,0 +1,1 @@
+Step one installs the system dependencies with apt — git, Python 3, the Python dev headers, pip, libpcap-dev for packet capture, build tools, and tmux, which the script uses later to keep the server and sensor running in the background even after you disconnect your SSH session.

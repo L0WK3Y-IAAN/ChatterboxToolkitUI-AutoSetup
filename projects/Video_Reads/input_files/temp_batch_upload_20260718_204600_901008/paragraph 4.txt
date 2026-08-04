@@ -1,0 +1,1 @@
+Assuming this is a fresh box, the script runs through five numbered steps.

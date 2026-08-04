@@ -1,0 +1,1 @@
+Step five drops in a demo trail file — a small custom trail definition used later in this course to guarantee a detection shows up in the dashboard, rather than relying on organic malicious traffic that may or may not appear during a live demo.

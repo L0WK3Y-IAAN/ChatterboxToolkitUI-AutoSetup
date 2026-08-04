@@ -1,0 +1,1 @@
+Step four is really just a warning, not an action: don't replace the stock maltrail.conf that comes with the clone. It already ships with working defaults for everything Mal trail needs. Any configuration changes for this lab are called out separately, rather than baked into a wholesale replacement of that file.
