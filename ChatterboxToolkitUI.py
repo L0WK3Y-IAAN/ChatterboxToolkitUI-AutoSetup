@@ -423,7 +423,7 @@ def generate_vc(audio_filepath,target_voice_filepath,inference_cfg_rate: float,s
         yield from yield_vc_updates(log_msg=error_msg, audio_data=None, file_list=None)
         raise gr.Error(error_msg)
 
-def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_weight,batch_mode: bool,batch_parameter: str,batch_values_str: str):
+def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_weight,batch_mode: bool,batch_parameter: str,batch_values_str: str, progress: gr.Progress = gr.Progress(track_tqdm=True)):
     global _last_single_tts_output_path_state_value # To store the last generated path
     model_tts = get_tts_model()
     yield from yield_tts_updates(log_msg="Starting Text-to-Voice Generation...", log_append=False, audio_data=None, file_list=None)
@@ -734,7 +734,7 @@ def _save_batch_tts_manifest(batch_output_dir, ref_audio_path):
     except Exception as e:
         logging.error(f"Error saving batch TTS manifest: {e}")
 
-def run_batch_tts(ref_audio_path_tts_batch,tts_exaggeration_batch,tts_temp_batch,tts_seed_num_batch,tts_cfg_weight_batch,text_files_to_process_list,concatenate_output: bool):
+def run_batch_tts(ref_audio_path_tts_batch,tts_exaggeration_batch,tts_temp_batch,tts_seed_num_batch,tts_cfg_weight_batch,text_files_to_process_list,concatenate_output: bool, progress: gr.Progress = gr.Progress(track_tqdm=True)):
     model_tts = get_tts_model()
     yield from yield_batch_tts_updates(log_msg="Starting Batch Text-to-Voice Generation...", log_append=False, file_list=None)
     if not text_files_to_process_list: raise gr.Error("No text files selected for batch processing.")
@@ -832,7 +832,7 @@ def select_batch_vc_ref_voice_from_project(filename):
     path = get_project_file_absolute_path(filename, 'voice_conversion')
     if not path or not os.path.exists(path): raise gr.Error(f"Reference voice file not found: {path}")
     return gr.update(value=path)
-def run_batch_vc(ref_voice_path_vc_batch,vc_inference_cfg_rate_batch,vc_sigma_min_batch,audio_files_to_process_list,concatenate_output_vc: bool):
+def run_batch_vc(ref_voice_path_vc_batch,vc_inference_cfg_rate_batch,vc_sigma_min_batch,audio_files_to_process_list,concatenate_output_vc: bool, progress: gr.Progress = gr.Progress(track_tqdm=True)):
     model_vc = get_vc_model()
     yield from yield_batch_vc_updates(log_msg="Starting Batch Voice Conversion...", log_append=False, file_list=None)
     if not audio_files_to_process_list: raise gr.Error("No audio files selected for batch VC processing.")
@@ -1536,7 +1536,7 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                             tts_audio_output,
                             tts_output_files
                         ],
-                        show_progress='minimal'
+                        show_progress='full'
                     )
 
                     # TTS Project-specific UI Interactions
@@ -1657,9 +1657,9 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                         outputs=[
                             vc_process_log,
                             vc_audio_output,
-                            vc_output_files 
+                            vc_output_files
                         ],
-                        show_progress='minimal' 
+                        show_progress='full'
                     )
 
                     # VC Project-specific UI Interactions
@@ -1793,7 +1793,7 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                             batch_tts_log,
                             batch_tts_output_files
                         ],
-                        show_progress='minimal'
+                        show_progress='full'
                     )
 
 
@@ -1897,7 +1897,7 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                             batch_vc_log,
                             batch_vc_output_files
                         ],
-                        show_progress='minimal'
+                        show_progress='full'
                     )
         
         # --- Data Preparation ---
