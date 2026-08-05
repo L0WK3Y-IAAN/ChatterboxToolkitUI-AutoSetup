@@ -1624,7 +1624,9 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                                 outputs=[tts_batch_options_group]
                             )
 
-                            tts_run_btn = gr.Button("🎤 Synthesize Speech", variant="primary")
+                            with gr.Row():
+                                tts_run_btn = gr.Button("🎤 Synthesize Speech", variant="primary")
+                                tts_cancel_btn = gr.Button("⏹ Cancel", variant="stop")
 
                         with gr.Column(scale=1): # Right column for logs and output
                             gr.Markdown("### TTS Log")
@@ -1642,7 +1644,7 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                             tts_history_html = gr.HTML(value=render_tts_history_html())
 
                     # TTS Button Click Event
-                    tts_run_btn.click(
+                    tts_run_event = tts_run_btn.click(
                         fn=generate_tts,
                         inputs=[
                             tts_text,
@@ -1663,6 +1665,7 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                         ],
                         show_progress='full'
                     )
+                    tts_cancel_btn.click(fn=None, inputs=None, outputs=None, cancels=[tts_run_event])
 
                     # TTS Project-specific UI Interactions
                     tts_load_text_from_project_btn.click(
