@@ -18,7 +18,7 @@ import json # For manifest
 import random
 import gc
 import numpy as np
-import urllib.parse
+import base64
 import html
 
 # NLTK for text processing
@@ -204,7 +204,7 @@ global_log_messages_vc = []
 global_log_messages_batch_tts = []
 global_log_messages_batch_vc = []
 tts_generation_history = []  # Most-recent-first list of {"path": str, "label": str, "time": str}
-MAX_TTS_HISTORY_ENTRIES = 25
+MAX_TTS_HISTORY_ENTRIES = 10  # Kept small since clips are embedded inline as base64 data URIs
 
 def add_tts_history_entry(filepath, label):
     global tts_generation_history
@@ -221,17 +221,31 @@ def render_tts_history_html():
         return "<div class='cb-tts-history-empty'>No generations yet this session.</div>"
     cards = []
     for entry in tts_generation_history:
-        file_url = "/file=" + urllib.parse.quote(entry["path"])
         filename = html.escape(os.path.basename(entry["path"]))
         label = html.escape(entry["label"])
+        try:
+            with open(entry["path"], "rb") as f:
+                b64_audio = base64.b64encode(f.read()).decode("ascii")
+        except OSError:
+            cards.append(f"""
+            <div class="cb-tts-history-item">
+                <div class="cb-tts-history-meta">
+                    <span class="cb-tts-history-time">[{entry['time']}]</span>
+                    <span class="cb-tts-history-label" title="{label}">{label}</span>
+                </div>
+                <span class="cb-tts-history-missing">File no longer available on disk.</span>
+            </div>
+            """)
+            continue
+        data_uri = f"data:audio/wav;base64,{b64_audio}"
         cards.append(f"""
         <div class="cb-tts-history-item">
             <div class="cb-tts-history-meta">
                 <span class="cb-tts-history-time">[{entry['time']}]</span>
                 <span class="cb-tts-history-label" title="{label}">{label}</span>
             </div>
-            <audio controls preload="none" src="{file_url}"></audio>
-            <a class="cb-tts-history-download" href="{file_url}" download="{filename}">⬇ Download</a>
+            <audio controls preload="none" src="{data_uri}"></audio>
+            <a class="cb-tts-history-download" href="{data_uri}" download="{filename}">⬇ Download</a>
         </div>
         """)
     return "<div class='cb-tts-history-list'>" + "".join(cards) + "</div>"
@@ -1520,6 +1534,12 @@ input[type="range"]::-webkit-slider-thumb {
 .cb-tts-history-download:hover {
     text-decoration: underline !important;
 }
+
+.cb-tts-history-missing {
+    color: var(--cb-text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
 """
 
 with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) as demo:
@@ -2654,4 +2674,4 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
 ensure_projects_base_dir() # Ensure base directory is created on startup
 
 if __name__ == "__main__":
-    demo.launch(inbrowser=True, allowed_paths=[os.path.abspath(PROJECTS_BASE_DIR), os.path.abspath("outputs")])
+    demo.launch(inbrowser=True)
