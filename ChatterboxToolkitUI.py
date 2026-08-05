@@ -18,6 +18,8 @@ import json # For manifest
 import random
 import gc
 import numpy as np
+import urllib.parse
+import html
 
 # NLTK for text processing
 import nltk
@@ -199,25 +201,58 @@ def set_seed(seed: int):
 
 global_log_messages_tts = []
 global_log_messages_vc = []
-global_log_messages_batch_tts = [] 
+global_log_messages_batch_tts = []
 global_log_messages_batch_vc = []
+tts_generation_history = []  # Most-recent-first list of {"path": str, "label": str, "time": str}
+MAX_TTS_HISTORY_ENTRIES = 25
 
-def yield_tts_updates(log_msg=None, audio_data=None, file_list=None, log_append=True):
+def add_tts_history_entry(filepath, label):
+    global tts_generation_history
+    if not filepath or not os.path.exists(filepath): return
+    tts_generation_history.insert(0, {
+        "path": os.path.abspath(filepath),
+        "label": label,
+        "time": datetime.now().strftime('%H:%M:%S'),
+    })
+    del tts_generation_history[MAX_TTS_HISTORY_ENTRIES:]
+
+def render_tts_history_html():
+    if not tts_generation_history:
+        return "<div class='cb-tts-history-empty'>No generations yet this session.</div>"
+    cards = []
+    for entry in tts_generation_history:
+        file_url = "/file=" + urllib.parse.quote(entry["path"])
+        filename = html.escape(os.path.basename(entry["path"]))
+        label = html.escape(entry["label"])
+        cards.append(f"""
+        <div class="cb-tts-history-item">
+            <div class="cb-tts-history-meta">
+                <span class="cb-tts-history-time">[{entry['time']}]</span>
+                <span class="cb-tts-history-label" title="{label}">{label}</span>
+            </div>
+            <audio controls preload="none" src="{file_url}"></audio>
+            <a class="cb-tts-history-download" href="{file_url}" download="{filename}">⬇ Download</a>
+        </div>
+        """)
+    return "<div class='cb-tts-history-list'>" + "".join(cards) + "</div>"
+
+def yield_tts_updates(log_msg=None, audio_data=None, file_list=None, log_append=True, refresh_history=False):
     global global_log_messages_tts
     if log_msg:
         if log_append: global_log_messages_tts.append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
         else: global_log_messages_tts = [f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}"]
     log_update = gr.update(value="\n".join(global_log_messages_tts))
-    if audio_data is not None: 
+    if audio_data is not None:
         audio_update = gr.update(value=audio_data, visible=True)
-        files_update = gr.update(value=None, visible=False) 
-    elif file_list is not None and len(file_list) > 0: 
-        audio_update = gr.update(value=None, visible=False) 
+        files_update = gr.update(value=None, visible=False)
+    elif file_list is not None and len(file_list) > 0:
+        audio_update = gr.update(value=None, visible=False)
         files_update = gr.update(value=file_list, visible=True)
-    else: 
+    else:
         audio_update = gr.update(value=None, visible=False)
         files_update = gr.update(value=None, visible=False)
-    yield log_update, audio_update, files_update
+    history_update = gr.update(value=render_tts_history_html()) if refresh_history else gr.update()
+    yield log_update, audio_update, files_update, history_update
 
 def yield_batch_tts_updates(log_msg=None, file_list=None, log_append=True):
     global global_log_messages_batch_tts 
@@ -471,9 +506,10 @@ def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_we
                 tts_output_filepath = os.path.join(batch_run_dir, tts_output_filename)
                 sf.write(tts_output_filepath, output_sr_np[1], output_sr_np[0])
                 generated_tts_file_paths.append(tts_output_filepath)
+                add_tts_history_entry(tts_output_filepath, f"{text_snippet_shorter} ({param_prefix})")
                 yield from yield_tts_updates(log_msg=f"Saved: {tts_output_filepath}")
             final_message = f"Batch generation complete. {len(generated_tts_file_paths)} files saved in: {batch_run_dir}"
-            yield from yield_tts_updates(log_msg=final_message, file_list=generated_tts_file_paths) 
+            yield from yield_tts_updates(log_msg=final_message, file_list=generated_tts_file_paths, refresh_history=True)
             gr.Info(final_message)
         else: 
             if seed_num != 0: set_seed(int(seed_num)); yield from yield_tts_updates(log_msg=f"Using seed: {int(seed_num)}")
@@ -482,11 +518,12 @@ def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_we
             # Use a snippet of the input text for the filename so downloads are meaningful.
             tts_output_filename = f"{text_snippet_shorter}.wav"
             tts_output_filepath = os.path.join(tts_output_combined_dir, tts_output_filename)
-            sf.write(tts_output_filepath, output_sr_np[1], output_sr_np[0]) 
+            sf.write(tts_output_filepath, output_sr_np[1], output_sr_np[0])
+            add_tts_history_entry(tts_output_filepath, text_snippet_shorter)
             yield from yield_tts_updates(log_msg=f"Saved TTS audio to: {tts_output_filepath}")
             final_message = "Text-to-Voice generation complete."
             # For the audio player, pass the filepath so the browser download uses this filename.
-            yield from yield_tts_updates(log_msg=final_message, audio_data=tts_output_filepath, file_list=[tts_output_filepath])
+            yield from yield_tts_updates(log_msg=final_message, audio_data=tts_output_filepath, file_list=[tts_output_filepath], refresh_history=True)
             gr.Info(final_message)
 
         if tts_output_filepath: # If a file was saved (primarily for single mode)
@@ -1418,6 +1455,71 @@ input[type="range"]::-webkit-slider-thumb {
     fill: #ffffff !important;
     stroke: #ffffff !important;
 }
+
+/* TTS generation history list */
+.cb-tts-history-empty {
+    color: var(--cb-text-muted);
+    font-size: 0.9rem;
+    padding: 0.5rem 0;
+}
+
+.cb-tts-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+.cb-tts-history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: linear-gradient(145deg, var(--cb-panel-soft), var(--cb-panel));
+    border: 1px solid var(--cb-border-subtle);
+    border-radius: var(--cb-radius-md);
+    padding: 0.5rem 0.75rem;
+}
+
+.cb-tts-history-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 90px;
+    max-width: 140px;
+    flex-shrink: 0;
+}
+
+.cb-tts-history-time {
+    color: var(--cb-text-muted);
+    font-size: 0.75rem;
+}
+
+.cb-tts-history-label {
+    color: var(--cb-text);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cb-tts-history-item audio {
+    flex: 1 1 auto;
+    height: 32px;
+    min-width: 0;
+}
+
+.cb-tts-history-download {
+    color: var(--cb-accent) !important;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    text-decoration: none !important;
+    flex-shrink: 0;
+}
+
+.cb-tts-history-download:hover {
+    text-decoration: underline !important;
+}
 """
 
 with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) as demo:
@@ -1516,6 +1618,8 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                                 show_download_button=True,
                             )
                             tts_output_files = gr.File(label="Download Generated Audio(s)", visible=False)
+                            gr.Markdown("### Previous Generations")
+                            tts_history_html = gr.HTML(value=render_tts_history_html())
 
                     # TTS Button Click Event
                     tts_run_btn.click(
@@ -1534,7 +1638,8 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                         outputs=[
                             tts_log,
                             tts_audio_output,
-                            tts_output_files
+                            tts_output_files,
+                            tts_history_html
                         ],
                         show_progress='full'
                     )
@@ -2549,4 +2654,4 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
 ensure_projects_base_dir() # Ensure base directory is created on startup
 
 if __name__ == "__main__":
-    demo.launch(inbrowser=True)
+    demo.launch(inbrowser=True, allowed_paths=[os.path.abspath(PROJECTS_BASE_DIR), os.path.abspath("outputs")])
