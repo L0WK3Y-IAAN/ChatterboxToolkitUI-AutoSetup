@@ -268,15 +268,16 @@ def yield_tts_updates(log_msg=None, audio_data=None, file_list=None, log_append=
     history_update = gr.update(value=render_tts_history_html()) if refresh_history else gr.update()
     yield log_update, audio_update, files_update, history_update
 
-def yield_batch_tts_updates(log_msg=None, file_list=None, log_append=True):
-    global global_log_messages_batch_tts 
+def yield_batch_tts_updates(log_msg=None, file_list=None, log_append=True, items_state=None):
+    global global_log_messages_batch_tts
     if log_msg:
         if log_append: global_log_messages_batch_tts.append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
         else: global_log_messages_batch_tts = [f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}"]
     log_update = gr.update(value="\n".join(global_log_messages_batch_tts))
     if file_list is not None and len(file_list) > 0: files_update = gr.update(value=file_list, visible=True)
     else: files_update = gr.update(value=None, visible=False)
-    yield log_update, files_update
+    items_update = items_state if items_state is not None else gr.update()
+    yield log_update, files_update, items_update
 
 def yield_batch_vc_updates(log_msg=None, file_list=None, log_append=True):
     global global_log_messages_batch_vc 
@@ -808,42 +809,72 @@ def run_batch_tts(ref_audio_path_tts_batch,tts_exaggeration_batch,tts_temp_batch
     yield from yield_batch_tts_updates(log_msg=f"Batch run ID: {run_id}. Saving to: {batch_run_specific_output_dir}")
     yield from yield_batch_tts_updates(log_msg=f"Processing {len(text_files_to_process_list)} text files...")
     all_generated_wav_paths = []
-    log_messages_list = [] 
+    batch_items = []  # Per-clip metadata for the inline playback/edit/regenerate UI
+    log_messages_list = []
     try:
         for i, text_filepath in enumerate(text_files_to_process_list):
             text_filename = os.path.basename(text_filepath)
             with open(text_filepath, 'r', encoding='utf-8') as f: text_content = f.read()
             if tts_seed_num_batch != 0: set_seed(int(tts_seed_num_batch))
             log_messages_list.append(f"Generating audio for {text_filename} ({i+1}/{len(text_files_to_process_list)})...")
-            yield from yield_batch_tts_updates(log_msg="\n".join(log_messages_list), log_append=False, file_list=None) 
+            yield from yield_batch_tts_updates(log_msg="\n".join(log_messages_list), log_append=False, file_list=None)
             audio_np = _synthesize_speech(model_tts, text_content, audio_prompt_path=ref_audio_path_tts_batch, exaggeration=tts_exaggeration_batch, temperature=tts_temp_batch, cfg_weight=tts_cfg_weight_batch)
             output_sr_np = (model_tts.sr, audio_np)
             output_filename = f"{sanitize_filename(os.path.splitext(text_filename)[0])}_{datetime.now().strftime('%H%M%S_%f')}.wav"
             output_path = os.path.join(single_files_output_dir, output_filename)
             sf.write(output_path, output_sr_np[1], output_sr_np[0])
             all_generated_wav_paths.append(output_path)
+            batch_items.append({
+                "wav_path": output_path,
+                "text": text_content,
+                "label": text_filename,
+                "ref_audio_path": ref_audio_path_tts_batch,
+                "exaggeration": tts_exaggeration_batch,
+                "temperature": tts_temp_batch,
+                "cfg_weight": tts_cfg_weight_batch,
+            })
             log_messages_list.append(f"-> Saved: {output_filename}")
             yield from yield_batch_tts_updates(log_msg="\n".join(log_messages_list), log_append=False, file_list=None)
         final_files_for_gr_output = all_generated_wav_paths
         if concatenate_output and all_generated_wav_paths:
             yield from yield_batch_tts_updates(log_msg="Concatenating generated audio files...")
-            combined_audio = pydub.AudioSegment.silent(duration=100) 
+            combined_audio = pydub.AudioSegment.silent(duration=100)
             for wav_path in all_generated_wav_paths:
                 combined_audio += pydub.AudioSegment.from_wav(wav_path)
-                combined_audio += pydub.AudioSegment.silent(duration=500) 
+                combined_audio += pydub.AudioSegment.silent(duration=500)
             concatenated_filename = f"batch_tts_combined_{run_id}.wav"
             concatenated_path = os.path.join(concatenated_output_dir, concatenated_filename)
             combined_audio.export(concatenated_path, format="wav")
-            final_files_for_gr_output = [concatenated_path] 
-            yield from yield_batch_tts_updates(log_msg=f"Concatenated audio saved to: {concatenated_path}", file_list=final_files_for_gr_output)
+            final_files_for_gr_output = [concatenated_path]
+            yield from yield_batch_tts_updates(log_msg=f"Concatenated audio saved to: {concatenated_path}", file_list=final_files_for_gr_output, items_state=batch_items)
             gr.Info("Batch TTS and concatenation complete!")
         else:
-            yield from yield_batch_tts_updates(log_msg=f"Batch TTS complete. {len(all_generated_wav_paths)} individual files saved.", file_list=final_files_for_gr_output)
+            yield from yield_batch_tts_updates(log_msg=f"Batch TTS complete. {len(all_generated_wav_paths)} individual files saved.", file_list=final_files_for_gr_output, items_state=batch_items)
             gr.Info("Batch TTS complete!")
     except Exception as e:
         error_msg = f"Error during Batch Text-to-Voice generation: {str(e)}"
-        yield from yield_batch_tts_updates(log_msg=error_msg, file_list=None)
+        yield from yield_batch_tts_updates(log_msg=error_msg, file_list=None, items_state=batch_items)
         raise gr.Error(error_msg)
+
+def regenerate_batch_tts_item(edited_text, items, idx):
+    if not items or idx >= len(items):
+        raise gr.Error("This clip is no longer available. Please re-run the batch.")
+    if not edited_text or not edited_text.strip():
+        raise gr.Error("Text cannot be empty.")
+    item = items[idx]
+    model_tts = get_tts_model()
+    audio_np = _synthesize_speech(
+        model_tts, edited_text,
+        audio_prompt_path=item["ref_audio_path"],
+        exaggeration=item["exaggeration"],
+        temperature=item["temperature"],
+        cfg_weight=item["cfg_weight"],
+    )
+    sf.write(item["wav_path"], audio_np, model_tts.sr)
+    updated_items = list(items)
+    updated_items[idx] = {**item, "text": edited_text}
+    gr.Info(f"Regenerated: {item['label']}")
+    return gr.update(value=item["wav_path"]), updated_items
 
 def handle_batch_vc_zip_upload(zip_filepath_vc):
     if not _current_project_root_dir: raise gr.Error("No project selected. Please select or create a project to upload batch files.")
@@ -1880,7 +1911,25 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                             batch_tts_log = gr.Textbox(label="Log", lines=10, interactive=False, show_copy_button=True) 
                             gr.Markdown("#### Batch Generated Audio Output")
                             batch_tts_output_files = gr.File(label="Download Generated Audio(s)", file_count="multiple", visible=False)
-                            
+                            batch_tts_items_state = gr.State([])
+
+                            @gr.render(inputs=[batch_tts_items_state])
+                            def render_batch_tts_items(items):
+                                if not items:
+                                    gr.Markdown("_No batch clips yet — run a batch generation to see them here._", elem_classes=["cb-tts-history-empty"])
+                                    return
+                                for idx, item in enumerate(items):
+                                    with gr.Group():
+                                        gr.Markdown(f"**{item['label']}**")
+                                        item_audio = gr.Audio(value=item["wav_path"], type="filepath", label="Playback", show_download_button=True)
+                                        item_text = gr.Textbox(value=item["text"], label="Text used for this clip (editable)", lines=2)
+                                        item_regen_btn = gr.Button("🔁 Regenerate this clip", size="sm")
+                                        item_regen_btn.click(
+                                            fn=regenerate_batch_tts_item,
+                                            inputs=[item_text, batch_tts_items_state, gr.State(idx)],
+                                            outputs=[item_audio, batch_tts_items_state],
+                                        )
+
                     # --- Batch TTS Event Handling ---
                     batch_tts_load_zip_btn.click(
                         fn=handle_batch_tts_zip_upload,
@@ -1919,7 +1968,8 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                         ],
                         outputs=[
                             batch_tts_log,
-                            batch_tts_output_files
+                            batch_tts_output_files,
+                            batch_tts_items_state
                         ],
                         show_progress='full'
                     )
