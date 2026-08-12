@@ -433,18 +433,25 @@ def get_project_file_absolute_path(filename, subdir_key):
 
 MAX_PROJECT_HISTORY_ENTRIES = 15  # Kept small since clips are embedded inline as base64 data URIs
 
-def _find_project_text_file(basename_with_ext):
-    """Looks for a .txt file by name in processed_text, then recursively under input_files
-    (batch zip uploads get extracted into timestamped temp_batch_upload_* subfolders there)."""
+def _find_project_text_file(sanitized_base):
+    """Looks for a .txt file in processed_text, then recursively under input_files
+    (batch zip uploads get extracted into timestamped temp_batch_upload_* subfolders there),
+    matching by sanitized basename since the wav filename was built from
+    sanitize_filename(original_txt_basename) -- e.g. "paragraph 4.txt" (space) on disk
+    produced "paragraph_4_..." in the wav filename, so a literal name lookup would miss it."""
     if not _current_project_root_dir: return None
     candidates = []
-    direct = get_project_file_absolute_path(basename_with_ext, 'processed_text')
-    if direct and os.path.exists(direct): candidates.append(direct)
-    input_files_dir = os.path.join(_current_project_root_dir, PROJECT_SUBDIRS["input_files"])
-    if os.path.isdir(input_files_dir):
-        for root, _dirs, files in os.walk(input_files_dir):
-            if basename_with_ext in files:
-                candidates.append(os.path.join(root, basename_with_ext))
+    search_dirs = [
+        os.path.join(_current_project_root_dir, PROJECT_SUBDIRS["processed_text"]),
+        os.path.join(_current_project_root_dir, PROJECT_SUBDIRS["input_files"]),
+    ]
+    for base_dir in search_dirs:
+        if not os.path.isdir(base_dir): continue
+        for root, _dirs, files in os.walk(base_dir):
+            for fname in files:
+                if not fname.lower().endswith('.txt'): continue
+                if sanitize_filename(os.path.splitext(fname)[0]) == sanitized_base:
+                    candidates.append(os.path.join(root, fname))
     if not candidates: return None
     candidates.sort(key=os.path.getmtime, reverse=True)
     return candidates[0]
@@ -459,7 +466,7 @@ def guess_legacy_text_for_batch_wav(wav_filename):
         original_base = "_".join(parts[:-1])
     else:
         original_base = parts[0] if len(parts) == 1 else "_".join(parts[:-1])
-    original_txt_path = _find_project_text_file(original_base + ".txt")
+    original_txt_path = _find_project_text_file(original_base)
     if original_txt_path:
         try:
             with open(original_txt_path, 'r', encoding='utf-8') as f:
