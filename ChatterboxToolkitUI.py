@@ -206,6 +206,24 @@ global_log_messages_batch_vc = []
 tts_generation_history = []  # Most-recent-first list of {"path": str, "label": str, "time": str}
 MAX_TTS_HISTORY_ENTRIES = 10  # Kept small since clips are embedded inline as base64 data URIs
 
+def write_text_sidecar(wav_path, text):
+    """Saves the exact text used for a generated wav next to it, so it can be recovered later from disk."""
+    try:
+        with open(wav_path + ".txt", "w", encoding="utf-8") as f:
+            f.write(text)
+    except OSError as e:
+        logging.warning(f"Could not write text sidecar for {wav_path}: {e}")
+
+def read_text_sidecar(wav_path):
+    sidecar_path = wav_path + ".txt"
+    if os.path.exists(sidecar_path):
+        try:
+            with open(sidecar_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except OSError:
+            return None
+    return None
+
 def add_tts_history_entry(filepath, label):
     global tts_generation_history
     if not filepath or not os.path.exists(filepath): return
@@ -413,6 +431,89 @@ def get_project_file_absolute_path(filename, subdir_key):
     if subdir_key not in PROJECT_SUBDIRS: return None
     return os.path.join(_current_project_root_dir, PROJECT_SUBDIRS[subdir_key], filename)
 
+MAX_PROJECT_HISTORY_ENTRIES = 15  # Kept small since clips are embedded inline as base64 data URIs
+
+def guess_legacy_text_for_batch_wav(wav_filename):
+    """Best-effort recovery of the source text for batch clips saved before sidecar .txt files existed."""
+    base_name_no_ext = os.path.splitext(wav_filename)[0]
+    parts = base_name_no_ext.split('_')
+    if len(parts) >= 3 and parts[-1].isdigit() and parts[-2].isdigit() and len(parts[-2]) == 6:
+        original_base = "_".join(parts[:-2])
+    elif len(parts) >= 2 and parts[-1].isdigit() and len(parts[-1]) > 3:
+        original_base = "_".join(parts[:-1])
+    else:
+        original_base = parts[0] if len(parts) == 1 else "_".join(parts[:-1])
+    original_txt_path = get_project_file_absolute_path(original_base + ".txt", 'processed_text')
+    if original_txt_path and os.path.exists(original_txt_path):
+        try:
+            with open(original_txt_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except OSError:
+            return None
+    return None
+
+def scan_project_tts_generations(limit=MAX_PROJECT_HISTORY_ENTRIES):
+    """Walks the active project's single_generations/tts and batch_generations/tts folders
+    for previously generated wav clips, pairing each with the text used to create it
+    (from a sidecar .txt when available, falling back to a best-effort guess for older clips)."""
+    if not _current_project_root_dir: return []
+    entries = []
+
+    single_base = os.path.join(_current_project_root_dir, PROJECT_SUBDIRS["single_generations_tts"])
+    if os.path.isdir(single_base):
+        for root, _dirs, files in os.walk(single_base):
+            for fname in files:
+                if not fname.lower().endswith('.wav'): continue
+                wav_path = os.path.join(root, fname)
+                text = read_text_sidecar(wav_path)
+                if text is None:
+                    text = f"(Original text not recorded for this legacy clip — folder: {os.path.basename(root)})"
+                entries.append({"path": wav_path, "label": fname, "text": text, "mtime": os.path.getmtime(wav_path)})
+
+    batch_base = os.path.join(_current_project_root_dir, PROJECT_SUBDIRS["batch_generations_tts"])
+    if os.path.isdir(batch_base):
+        for run_dir in os.listdir(batch_base):
+            single_files_dir = os.path.join(batch_base, run_dir, "single_files")
+            if not os.path.isdir(single_files_dir): continue
+            for fname in os.listdir(single_files_dir):
+                if not fname.lower().endswith('.wav'): continue
+                wav_path = os.path.join(single_files_dir, fname)
+                text = read_text_sidecar(wav_path) or guess_legacy_text_for_batch_wav(fname)
+                if text is None:
+                    text = "(Original text not recorded for this legacy clip)"
+                entries.append({"path": wav_path, "label": f"{run_dir} / {fname}", "text": text, "mtime": os.path.getmtime(wav_path)})
+
+    entries.sort(key=lambda e: e["mtime"], reverse=True)
+    return entries[:limit]
+
+def render_project_generation_history_html(entries):
+    if not entries:
+        return "<div class='cb-tts-history-empty'>No generated audio found in this project yet.</div>"
+    cards = []
+    for entry in entries:
+        label = html.escape(entry["label"])
+        text_preview = html.escape(entry["text"])
+        filename = html.escape(os.path.basename(entry["path"]))
+        ts = datetime.fromtimestamp(entry["mtime"]).strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            with open(entry["path"], "rb") as f:
+                b64_audio = base64.b64encode(f.read()).decode("ascii")
+        except OSError:
+            continue
+        data_uri = f"data:audio/wav;base64,{b64_audio}"
+        cards.append(f"""
+        <div class="cb-tts-history-item cb-project-history-item">
+            <div class="cb-tts-history-meta cb-project-history-meta">
+                <span class="cb-tts-history-time">{ts}</span>
+                <span class="cb-tts-history-label" title="{label}">{label}</span>
+            </div>
+            <audio controls preload="none" src="{data_uri}"></audio>
+            <p class="cb-project-history-text">{text_preview}</p>
+            <a class="cb-tts-history-download" href="{data_uri}" download="{filename}">⬇ Download</a>
+        </div>
+        """)
+    return "<div class='cb-tts-history-list'>" + "".join(cards) + "</div>"
+
 def generate_vc(audio_filepath,target_voice_filepath,inference_cfg_rate: float,sigma_min: float,batch_mode: bool,batch_parameter: str,batch_values_str: str, progress: gr.Progress = gr.Progress(track_tqdm=True) ):
     model_vc = get_vc_model()
     yield from yield_vc_updates(log_msg="Starting Voice Conversion...", log_append=False, audio_data=None, file_list=None)
@@ -520,6 +621,7 @@ def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_we
                 tts_output_filename = f"{param_prefix}_{datetime.now().strftime('%H%M%S_%f')}.wav"
                 tts_output_filepath = os.path.join(batch_run_dir, tts_output_filename)
                 sf.write(tts_output_filepath, output_sr_np[1], output_sr_np[0])
+                write_text_sidecar(tts_output_filepath, text)
                 generated_tts_file_paths.append(tts_output_filepath)
                 add_tts_history_entry(tts_output_filepath, f"{text_snippet_shorter} ({param_prefix})")
                 yield from yield_tts_updates(log_msg=f"Saved: {tts_output_filepath}")
@@ -534,6 +636,7 @@ def generate_tts(text,audio_prompt_path,exaggeration,temperature,seed_num,cfg_we
             tts_output_filename = f"{text_snippet_shorter}.wav"
             tts_output_filepath = os.path.join(tts_output_combined_dir, tts_output_filename)
             sf.write(tts_output_filepath, output_sr_np[1], output_sr_np[0])
+            write_text_sidecar(tts_output_filepath, text)
             add_tts_history_entry(tts_output_filepath, text_snippet_shorter)
             yield from yield_tts_updates(log_msg=f"Saved TTS audio to: {tts_output_filepath}")
             final_message = "Text-to-Voice generation complete."
@@ -823,6 +926,7 @@ def run_batch_tts(ref_audio_path_tts_batch,tts_exaggeration_batch,tts_temp_batch
             output_filename = f"{sanitize_filename(os.path.splitext(text_filename)[0])}_{datetime.now().strftime('%H%M%S_%f')}.wav"
             output_path = os.path.join(single_files_output_dir, output_filename)
             sf.write(output_path, output_sr_np[1], output_sr_np[0])
+            write_text_sidecar(output_path, text_content)
             all_generated_wav_paths.append(output_path)
             batch_items.append({
                 "wav_path": output_path,
@@ -871,6 +975,7 @@ def regenerate_batch_tts_item(edited_text, items, idx):
         cfg_weight=item["cfg_weight"],
     )
     sf.write(item["wav_path"], audio_np, model_tts.sr)
+    write_text_sidecar(item["wav_path"], edited_text)
     updated_items = list(items)
     updated_items[idx] = {**item, "text": edited_text}
     gr.Info(f"Regenerated: {item['label']}")
@@ -1570,6 +1675,29 @@ input[type="range"]::-webkit-slider-thumb {
     color: var(--cb-text-muted);
     font-size: 0.85rem;
     font-style: italic;
+}
+
+/* Project-wide generation history (playback + text side by side, wrapped) */
+.cb-project-history-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+}
+
+.cb-project-history-meta {
+    max-width: none;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.cb-project-history-text {
+    color: var(--cb-text-muted);
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    max-height: 4.5rem;
+    overflow-y: auto;
+    margin: 0;
 }
 """
 
@@ -2484,6 +2612,16 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                     project_download_output = gr.File(label="Download Zip", visible=False)
                     delete_status_message = gr.Textbox(label="File Operations Log", interactive=False, lines=3)
 
+                    gr.Markdown("### Previously Generated Audio (this project)")
+                    gr.Markdown(
+                        "Browse TTS clips already saved in this project, with the text used to generate each one. "
+                        f"Shows the {MAX_PROJECT_HISTORY_ENTRIES} most recent."
+                    )
+                    project_gen_history_load_btn = gr.Button("🎧 Load Previous Generations")
+                    project_gen_history_html = gr.HTML(
+                        value="<div class='cb-tts-history-empty'>Click \"Load Previous Generations\" to browse this project's saved audio clips.</div>"
+                    )
+
             all_project_dependent_ui_elements = [ # Combined list for easier management
                 project_dropdown, 
                 current_project_path_display, 
@@ -2704,6 +2842,13 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default(), css=CSS) 
                 fn=delete_project_items_backend,
                 inputs=[project_file_explorer, current_project_path_display],
                 outputs=[delete_status_message, project_file_explorer]
+            )
+
+            # Previously Generated Audio (project-wide, loaded from disk)
+            project_gen_history_load_btn.click(
+                fn=lambda: gr.update(value=render_project_generation_history_html(scan_project_tts_generations())),
+                inputs=[],
+                outputs=[project_gen_history_html]
             )
 
 
