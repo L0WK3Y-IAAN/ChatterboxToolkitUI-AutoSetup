@@ -53,12 +53,15 @@ fi
 echo "[*] Using CHATTERBOX_MODEL=${CHATTERBOX_MODEL}"
 
 # Pick a Python interpreter for the venv. This project is built/tested against
-# 3.11-3.12; a bare "python3" can silently resolve to whatever Homebrew most
-# recently made the default (e.g. a brand-new 3.14 with no numpy/torch wheels
-# yet), which breaks the dependency install with confusing build errors.
-# Prefer known-good versions, in order, before falling back to plain python3.
+# 3.11; a bare "python3" can silently resolve to whatever Homebrew most
+# recently made the default (e.g. 3.12 or a brand-new 3.14). numpy==1.25.2
+# (pulled in by gradio==5.44.1) only ships prebuilt wheels through Python
+# 3.11 -- anything newer falls back to a source build that fails outright
+# (newer Python removed pkgutil.ImpImporter, which the old setuptools/
+# pkg_resources bundled with that numpy release still needs).
+# Prefer 3.11 explicitly, before falling back to newer versions.
 PYTHON_BIN=""
-for candidate in python3.12 python3.11 python3; do
+for candidate in python3.11 python3.12 python3; do
     if command -v "$candidate" >/dev/null 2>&1; then
         PYTHON_BIN="$candidate"
         break
