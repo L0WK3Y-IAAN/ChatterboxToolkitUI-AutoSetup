@@ -52,10 +52,28 @@ if [[ -z "${CHATTERBOX_MODEL:-}" ]]; then
 fi
 echo "[*] Using CHATTERBOX_MODEL=${CHATTERBOX_MODEL}"
 
+# Pick a Python interpreter for the venv. This project is built/tested against
+# 3.11-3.12; a bare "python3" can silently resolve to whatever Homebrew most
+# recently made the default (e.g. a brand-new 3.14 with no numpy/torch wheels
+# yet), which breaks the dependency install with confusing build errors.
+# Prefer known-good versions, in order, before falling back to plain python3.
+PYTHON_BIN=""
+for candidate in python3.12 python3.11 python3; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+        PYTHON_BIN="$candidate"
+        break
+    fi
+done
+if [ -z "$PYTHON_BIN" ]; then
+    echo "[!] No suitable python3 interpreter found on PATH."
+    exit 1
+fi
+echo "[*] Using Python interpreter: $(command -v "$PYTHON_BIN") ($("$PYTHON_BIN" --version 2>&1))"
+
 # Check if the virtual environment exists in the repo root
 if [ ! -d "$ROOT_DIR/toolkit" ]; then
     echo "[*] Virtual environment not found. Creating 'toolkit'..."
-    python3 -m venv "$ROOT_DIR/toolkit"
+    "$PYTHON_BIN" -m venv "$ROOT_DIR/toolkit"
     echo "[+] Virtual environment created successfully."
 else
     echo "[*] Virtual environment 'toolkit' already exists."
