@@ -30,16 +30,20 @@ def install_deps():
 
     run([py, "-m", "pip", "install", "-U", "pip", "wheel", "setuptools"])
 
-    # CPU PyTorch for Mac
+    # Install everything in a single pip invocation so the resolver picks one
+    # mutually-consistent set of versions. Installing torch/torchaudio
+    # separately from chatterbox-tts (which pins its own torch requirement)
+    # let a later install silently downgrade torch out from under torchvision,
+    # leaving torchvision's compiled extensions built against a torch version
+    # that was no longer installed (RuntimeError: operator torchvision::nms
+    # does not exist). torchvision itself isn't used anywhere in this project
+    # -- it's only pulled in transitively by transformers -- so it's dropped
+    # entirely rather than pinned, matching requirements.txt's torch==2.6.0.
     run([
         py, "-m", "pip", "install",
-        "torch", "torchaudio", "torchvision",
+        "torch==2.6.0",
+        "torchaudio==2.6.0",
         "--extra-index-url", "https://download.pytorch.org/whl/cpu",
-    ])
-
-    # Core Python deps
-    run([
-        py, "-m", "pip", "install",
         "gradio==5.44.1",
         "fastapi",
         "uvicorn",
